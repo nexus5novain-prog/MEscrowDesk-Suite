@@ -1,0 +1,114 @@
+import { AadPurpose } from './aad-purpose.generated'
+import { xchacha20poly1305 } from '@noble/ciphers/chacha'
+import { randomBytes } from '@noble/ciphers/webcrypto'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { p256 } from '@noble/curves/nist.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+
+export function chachaEncrypt(key: Uint8Array, plaintext: string, aad?: Uint8Array): Uint8Array {
+  return chachaEncryptBytes(key, new TextEncoder().encode(plaintext), aad)
+}
+
+/** Binary variant of chachaEncrypt for binary upstream frames (touch samples). */
+export function chachaEncryptBytes(key: Uint8Array, plaintext: Uint8Array, aad?: Uint8Array): Uint8Array {
+  const nonce = randomBytes(24)
+  const key32 = new Uint8Array(32)
+  key32.set(key.slice(0, 32))
+  const cipher = xchacha20poly1305(key32, nonce, aad)
+  const ciphertext = cipher.encrypt(plaintext)
+  const result = new Uint8Array(nonce.length + ciphertext.length)
+  result.set(nonce, 0)
+  result.set(ciphertext, nonce.length)
+  return result
+}
+
+export function chachaDecrypt(key: Uint8Array, data: Uint8Array, aad?: Uint8Array): string {
+  return new TextDecoder().decode(chachaDecryptBytes(key, data, aad))
+}
+
+export function chachaDecryptBytes(key: Uint8Array, data: Uint8Array, aad?: Uint8Array): Uint8Array {
+  const nonce = data.slice(0, 24)
+  const ciphertext = data.slice(24)
+  const key32 = new Uint8Array(32)
+  key32.set(key.slice(0, 32))
+  return xchacha20poly1305(key32, nonce, aad).decrypt(ciphertext)
+}
+
+export function httpRequestAad(endpoint: string): Uint8Array {
+  return new TextEncoder().encode(`${AadPurpose.HttpRequest}.POST.${endpoint}`)
+}
+
+export function decryptGraphqlResponse(key: Uint8Array, request: Uint8Array, response: Uint8Array): string {
+  const body = chachaDecryptBytes(key, response)
+  const hash = sha256(request)
+  if (body.length < 33 || body[0] !== 0 || !hash.every((byte, index) => body[index + 1] === byte)) {
+    throw new Error('Invalid GraphQL response binding')
+  }
+  return new TextDecoder().decode(body.subarray(33))
+}
+
+export function arrayBufferToBitArray(buffer: ArrayBuffer): Uint8Array {
+  return new Uint8Array(buffer)
+}
+
+export function bitArrayToUint8Array(arr: Uint8Array): Uint8Array {
+  return arr
+}
+
+export function bitArrayToBase64(arr: Uint8Array): string {
+  return btoa(String.fromCharCode(...arr))
+}
+
+// ---- ECDH (P-256 / secp256r1) ----
+// Uses @noble/curves pure-JS implementation — works without HTTPS (no crypto.subtle needed).
+// Public keys are X9.63 uncompressed (65 bytes, 0x04 || X || Y) for Kotlin interop.
+
+export interface ECDHKeyPair {
+  secretKey: Uint8Array  // 32 bytes
+  publicKey: Uint8Array  // 65 bytes, X9.63 uncompressed
+}
+
+export function generateECDHKeyPair(): ECDHKeyPair {
+  const kp = p256.keygen()
+  const publicKey = p256.getPublicKey(kp.secretKey, false) // uncompressed
+  return { secretKey: kp.secretKey, publicKey }
+}
+
+export function computeECDHSharedKey(
+  secretKey: Uint8Array,
+  peerPublicKeyBytes: Uint8Array,
+): string {
+  const sharedSecret = p256.getSharedSecret(secretKey, peerPublicKeyBytes)
+  // @noble returns the compressed point (0x02/0x03 prefix + X coordinate, 33 bytes).
+  // Android `KeyAgreement.generateSecret` and iOS `SecKeyCopyKeyExchangeResult`
+  // both return the bare 32-byte X coordinate. Drop the prefix to stay aligned.
+  const xCoordinate = sharedSecret.slice(1)
+  const hash = sha256(xCoordinate)
+  return bitArrayToBase64(new Uint8Array(hash))
+}
+
+// ---- Ed25519 ----
+// Uses @noble/curves pure-JS implementation — works without HTTPS.
+
+export function verifyEd25519Signature(
+  publicKeyBase64: string,
+  data: string,
+  signatureBase64: string,
+): boolean {
+  try {
+    const pubBytes = Uint8Array.from(atob(publicKeyBase64), (c) => c.charCodeAt(0))
+    const sigBytes = Uint8Array.from(atob(signatureBase64), (c) => c.charCodeAt(0))
+    const dataBytes = new TextEncoder().encode(data)
+    return ed25519.verify(sigBytes, dataBytes, pubBytes)
+  } catch {
+    return false
+  }
+}
+
+export interface InitResponse {
+  httpsPort?: number
+  signaturePublicKey: string
+  opaquePublicKey?: string
+  authenticated: boolean
+  passwordRequired: boolean
+}

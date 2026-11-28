@@ -1,0 +1,913 @@
+/**
+ * BetterDesk Console - Users Routes
+ * User management for admins (CRUD operations)
+ */
+
+const express = require('express');
+const router = express.Router();
+const authService = require('../services/authService');
+const db = require('../services/database');
+const { apiClient } = require('../services/betterdeskApi');
+const { assertSafeApiId } = require('../lib/goApiPath');
+const userSync = require('../services/userSync');
+const userScopeService = require('../services/userScopeService');
+const deviceGroupService = require('../services/deviceGroupService');
+const panelAccessPolicyService = require('../services/panelAccessPolicyService');
+const serverBackend = require('../services/serverBackend');
+const {
+    requireAuth,
+    requirePermission,
+    requestHasPermission,
+    isSuperAdminRole,
+} = require('../middleware/auth');
+const { passwordChangeLimiter } = require('../middleware/rateLimiter');
+
+// ---------------------------------------------------------------------------
+//  Helper: proxy to Go server
+// ---------------------------------------------------------------------------
+
+async function goApiProxy(req, res, method, path, body) {
+    try {
+        const opts = { method, url: path };
+        if (body) opts.data = body;
+        const resp = await apiClient(opts);
+        res.status(resp.status).json(resp.data);
+    } catch (err) {
+        const status = err.response?.status || 500;
+        const data = err.response?.data || { error: 'Go server unreachable' };
+        res.status(status).json(data);
+    }
+}
+
+/** Expose only expected client-facing errors; keep unexpected 500s generic. */
+function clientErrorMessage(err, req) {
+    if (err.status === 400) return err.message;
+    if (err.code === 'PEER_GRANTS_UNAVAILABLE' || err.code === 'STRATEGY_ASSIGNMENT_UNAVAILABLE') {
+        return err.message;
+    }
+    return req.t('errors.server_error');
+}
+
+async function resolveGoUserIdOrRespond(req, res) {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId) || userId <= 0) {
+        res.status(400).json({ success: false, error: 'Invalid user ID' });
+        return null;
+    }
+
+    const localUser = await db.getUserById(userId);
+    if (!localUser) {
+        res.status(404).json({ success: false, error: req.t('users.not_found') });
+        return null;
+    }
+
+    const goUserId = await userSync.resolveGoUserId(userId);
+    if (!goUserId) {
+        res.status(502).json({ success: false, error: 'User is not synchronized with the Go server' });
+        return null;
+    }
+    return goUserId;
+}
+
+function normalizeGroupGuids(value) {
+    const raw = Array.isArray(value) ? value : String(value || '').split(',');
+    return Array.from(new Set(raw.map(v => String(v || '').trim()).filter(Boolean))).slice(0, 100);
+}
+
+function isValidGroupGuid(guid) {
+    return typeof guid === 'string' && guid.length > 0 && guid.length <= 80 && /^[A-Za-z0-9_.:-]+$/.test(guid);
+}
+
+function validateGroupGuidsFromBody(body) {
+    if (!Object.prototype.hasOwnProperty.call(body || {}, 'groupGuids')) return null;
+    const groupGuids = normalizeGroupGuids(body.groupGuids);
+    if (groupGuids.some(guid => !isValidGroupGuid(guid))) {
+        const error = new Error('Invalid user group identifier');
+        error.status = 400;
+        throw error;
+    }
+    return groupGuids;
+}
+
+function serializeUserGroup(group) {
+    return {
+        guid: group.guid,
+        name: group.name,
+        note: group.note || '',
+        team_id: group.team_id || '',
+        member_count: group.member_count || 0
+    };
+}
+
+function normalizeUserGroupPayload(body) {
+    const name = String((body && body.name) || '').trim();
+    const note = String((body && body.note) || '').trim();
+    const teamId = String((body && body.team_id) || '').trim();
+
+    if (!name) {
+        const error = new Error('Group name is required');
+        error.status = 400;
+        throw error;
+    }
+    if (name.length > 80) {
+        const error = new Error('Group name is too long');
+        error.status = 400;
+        throw error;
+    }
+    if (note.length > 500) {
+        const error = new Error('Group note is too long');
+        error.status = 400;
+        throw error;
+    }
+    if (teamId && !isValidGroupGuid(teamId)) {
+        const error = new Error('Invalid team identifier');
+        error.status = 400;
+        throw error;
+    }
+
+    return { name, note, team_id: teamId };
+}
+
+async function serializeUserForList(u) {
+    try {
+        const folderIds = await userScopeService.getUserFolderIds(db, u.username);
+        const peerGrants = await userScopeService.getUserPeerGrantIds(db, u.id);
+        let strategyGuid = '';
+        if (typeof db.getUserStrategyGuid === 'function') {
+            try {
+                strategyGuid = await db.getUserStrategyGuid(u.id);
+            } catch (_) {}
+        }
+        return {
+            id: u.id,
+            username: u.username,
+            role: u.role,
+            email: u.email || '',
+            auth_provider: u.auth_provider || 'local',
+            created_at: u.created_at,
+            last_login: u.last_login,
+            user_groups: await getUserGroupGuids(u.id),
+            folder_ids: folderIds,
+            peer_grants: peerGrants,
+            strategy_guid: strategyGuid
+        };
+    } catch (err) {
+        console.warn(`[users] scope enrichment failed for ${u?.username || u?.id}:`, err.message);
+        return {
+            id: u.id,
+            username: u.username,
+            role: u.role,
+            email: u.email || '',
+            auth_provider: u.auth_provider || 'local',
+            created_at: u.created_at,
+            last_login: u.last_login,
+            user_groups: [],
+            folder_ids: [],
+            peer_grants: [],
+            strategy_guid: ''
+        };
+    }
+}
+
+async function applyUserScopeFromBody(userId, username, body) {
+    assertUserScopeWritersAvailable(body);
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'folderIds')) {
+        await userScopeService.syncUserFolderAccess(db, username, body.folderIds);
+    }
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'peerIds')) {
+        await userScopeService.syncUserPeerGrants(db, userId, body.peerIds);
+    }
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'strategyGuid')) {
+        const strategyGuid = await db.setUserStrategyAssignment(userId, body.strategyGuid || '');
+        if (await serverBackend.isBetterDesk()) {
+            try {
+                const userKey = typeof db.resolveUserAssignmentKey === 'function'
+                    ? await db.resolveUserAssignmentKey(username)
+                    : username;
+                await apiClient({
+                    method: 'POST',
+                    url: '/strategies/assign',
+                    data: {
+                        strategy: strategyGuid || undefined,
+                        users: userKey ? [userKey] : []
+                    }
+                });
+            } catch (err) {
+                // Local assignment already persisted; Go mirror stays best-effort.
+                console.warn('[users] Strategy assign Go sync failed:', err.message);
+            }
+        }
+    }
+}
+
+/** Fail before create/update writes when required scope writers are missing (#380). */
+function assertUserScopeWritersAvailable(body) {
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'peerIds')
+        && typeof db.setUserPeerGrants !== 'function') {
+        const error = new Error(
+            'Per-user device grants are unavailable (database.setUserPeerGrants missing). Refusing to silently no-op.'
+        );
+        error.status = 500;
+        error.code = 'PEER_GRANTS_UNAVAILABLE';
+        throw error;
+    }
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'strategyGuid')
+        && typeof db.setUserStrategyAssignment !== 'function') {
+        const error = new Error(
+            'Per-user strategy assignment is unavailable (database.setUserStrategyAssignment missing). Refusing to silently no-op.'
+        );
+        error.status = 500;
+        error.code = 'STRATEGY_ASSIGNMENT_UNAVAILABLE';
+        throw error;
+    }
+}
+
+async function getUserGroupGuids(userId) {
+    if (typeof db.getUserGroupsForUser !== 'function') return [];
+    const groups = await db.getUserGroupsForUser(userId);
+    return (groups || []).map(group => group.guid).filter(Boolean);
+}
+
+async function updateUserGroupMembershipsFromBody(userId, body) {
+    const groupGuids = validateGroupGuidsFromBody(body);
+    if (!groupGuids) return null;
+    await db.setUserGroupMemberships(userId, groupGuids);
+    return groupGuids;
+}
+
+function runBestEffortUserSync(operation) {
+    try {
+        Promise.resolve(operation()).catch(() => {});
+    } catch (_) {
+        // Best-effort sync must never break local user management.
+    }
+}
+
+function normalizeUserEmail(value) {
+    if (value === undefined || value === null) return undefined;
+    const trimmed = String(value).trim();
+    if (!trimmed) return '';
+    if (trimmed.length > 200) {
+        const err = new Error('email_too_long');
+        err.status = 400;
+        throw err;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        const err = new Error('invalid_email');
+        err.status = 400;
+        throw err;
+    }
+    return trimmed;
+}
+
+/**
+ * Account-name format for the panel (issue #498, 2026-11-13).
+ *
+ * Matches the Go server's `db.ValidUsername`. A username ends up in filesystem
+ * paths, audit lines and address-book keys, so no whitespace, path separators or
+ * control characters are allowed.
+ */
+const USERS_USERNAME_RE = /^[A-Za-z0-9_.@-]{3,64}$/;
+
+const VALID_USER_ROLES = new Set([    'super_admin',
+    'admin',
+    'server_admin',
+    'global_admin',
+    'operator',
+    'viewer',
+    'pro',
+]);
+
+/**
+ * Mirrors betterdesk-server/auth.CanAssignRole. The role hierarchy is
+ * branched: global_admin is not permitted to create or promote server-level
+ * roles, even though it can manage users.
+ */
+function canAssignUserRole(callerRole, targetRole) {
+    if (isSuperAdminRole(callerRole)) return true;
+    if (callerRole === 'global_admin') {
+        return targetRole === 'operator'
+            || targetRole === 'viewer'
+            || targetRole === 'pro';
+    }
+    return false;
+}
+
+function rejectUnauthorizedRoleAssignment(res) {
+    return res.status(403).json({
+        success: false,
+        error: 'Cannot assign a role higher than your own',
+    });
+}
+
+function requireAnyPermission(...permissions) {
+    return function(req, res, next) {
+        if (req.permissionContextLoaded && req.permissionLoadError) {
+            return res.status(503).json({
+                success: false,
+                error: 'Permission service unavailable',
+                code: 'permission_service_unavailable'
+            });
+        }
+        if (permissions.some(permission => requestHasPermission(req, permission))) return next();
+        return res.status(403).json({ success: false, error: `Permission denied: ${permissions.join(' or ')}` });
+    };
+}
+
+/**
+ * GET /users - Users management page (admin only)
+ */
+router.get('/users', requireAuth, requirePermission('user.view'), (req, res) => {
+    res.render('users', {
+        title: req.t('nav.users'),
+        activePage: 'users'
+    });
+});
+
+/**
+ * GET /api/users - Get all users (admin only)
+ */
+router.get('/api/users', requireAuth, requirePermission('user.view'), async (req, res) => {
+    try {
+        await userSync.backfillFromGo();
+        const users = await db.getAllUsers();
+        
+        // Remove sensitive data
+        const safeUsers = await Promise.all(users.map(u => serializeUserForList(u)));
+        
+        res.json({
+            success: true,
+            data: {
+                users: safeUsers,
+                total: safeUsers.length
+            }
+        });
+    } catch (err) {
+        console.error('Get users error:', err);
+        res.status(500).json({
+            success: false,
+            error: req.t('errors.server_error')
+        });
+    }
+});
+
+/**
+ * GET /api/panel/user-groups - Get user groups for panel assignment UIs.
+ */
+router.get('/api/panel/user-groups', requireAuth, requireAnyPermission('user.view', 'device.edit'), async (req, res) => {
+    try {
+        const groups = await db.getAllUserGroups();
+        res.json({
+            success: true,
+            data: {
+                groups: (groups || []).map(serializeUserGroup),
+                total: groups.length
+            }
+        });
+    } catch (err) {
+        console.error('Get user groups error:', err);
+        res.status(500).json({ success: false, error: req.t('errors.server_error') });
+    }
+});
+
+/**
+ * POST /api/panel/user-groups - Create a user group for panel access scoping.
+ */
+router.post('/api/panel/user-groups', requireAuth, requirePermission('user.edit'), async (req, res) => {
+    try {
+        const payload = normalizeUserGroupPayload(req.body || {});
+        const group = await db.createUserGroup(payload);
+        await db.logAction(req.session.userId, 'user_group_created', `Created user group: ${group.name}`, req.ip);
+        res.json({ success: true, data: { group: serializeUserGroup(group) } });
+    } catch (err) {
+        console.error('Create user group error:', err);
+        res.status(err.status || 500).json({
+            success: false,
+            error: err.status === 400 ? err.message : req.t('errors.server_error')
+        });
+    }
+});
+
+/**
+ * PATCH /api/panel/user-groups/:guid - Update a user group.
+ */
+router.patch('/api/panel/user-groups/:guid', requireAuth, requirePermission('user.edit'), async (req, res) => {
+    try {
+        const guid = String(req.params.guid || '').trim();
+        if (!isValidGroupGuid(guid)) {
+            return res.status(400).json({ success: false, error: 'Invalid user group identifier' });
+        }
+
+        const existing = await db.getUserGroupByGuid(guid);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: req.t('users.user_group_not_found') });
+        }
+
+        const payload = normalizeUserGroupPayload(req.body || {});
+        const group = await db.updateUserGroup(guid, payload);
+        await db.logAction(req.session.userId, 'user_group_updated', `Updated user group: ${group.name}`, req.ip);
+        res.json({ success: true, data: { group: serializeUserGroup(group) } });
+    } catch (err) {
+        console.error('Update user group error:', err);
+        res.status(err.status || 500).json({
+            success: false,
+            error: err.status === 400 ? err.message : req.t('errors.server_error')
+        });
+    }
+});
+
+/**
+ * DELETE /api/panel/user-groups/:guid - Delete a user group.
+ */
+router.delete('/api/panel/user-groups/:guid', requireAuth, requirePermission('user.edit'), async (req, res) => {
+    try {
+        const guid = String(req.params.guid || '').trim();
+        if (!isValidGroupGuid(guid)) {
+            return res.status(400).json({ success: false, error: 'Invalid user group identifier' });
+        }
+
+        const group = await db.getUserGroupByGuid(guid);
+        if (!group) {
+            return res.status(404).json({ success: false, error: req.t('users.user_group_not_found') });
+        }
+
+        await panelAccessPolicyService.savePolicy('group', guid, {});
+        await db.deleteUserGroup(guid);
+        await db.logAction(req.session.userId, 'user_group_deleted', `Deleted user group: ${group.name}`, req.ip);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Delete user group error:', err);
+        res.status(500).json({ success: false, error: req.t('errors.server_error') });
+    }
+});
+
+/**
+ * POST /api/users - Create new user (admin only)
+ */
+router.post('/api/users', requireAuth, requirePermission('user.create'), passwordChangeLimiter, async (req, res) => {
+    try {
+        const { username, password, role, email } = req.body;
+        
+        // Validate input
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.fill_required')
+            });
+        }
+        
+        // Validate username format
+        if (!USERS_USERNAME_RE.test(username)) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.invalid_username')
+            });
+        }
+        
+        // Check username uniqueness
+        const existingUser = await db.getUserByUsername(username);
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.username_exists')
+            });
+        }
+
+        const groupGuids = validateGroupGuidsFromBody(req.body) || [];
+        
+        // Validate password strength
+        const passwordCheck = authService.validatePasswordStrength(password);
+        if (passwordCheck.strength === 'weak') {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.weak_password'),
+                feedback: passwordCheck.feedback
+            });
+        }
+        
+        // Validate role (7-role hierarchy — Phase 52) and apply the same
+        // branched assignment boundaries as the Go API before any local write
+        // or asynchronous user sync.
+        const userRole = VALID_USER_ROLES.has(role) ? role : 'viewer';
+        if (!canAssignUserRole(req.session.user?.role, userRole)) {
+            return rejectUnauthorizedRoleAssignment(res);
+        }
+
+        // Refuse create before write if peer/strategy scope cannot be persisted (#380).
+        assertUserScopeWritersAvailable(req.body);
+        
+        // Hash password
+        const passwordHash = await authService.hashPassword(password);
+        
+        // Create user
+        const result = await db.createUser(username, passwordHash, userRole);
+        await db.setUserGroupMemberships(result.id, groupGuids);
+
+        let savedEmail = '';
+        if (email !== undefined) {
+            savedEmail = normalizeUserEmail(email);
+            await db.updateUserProfile(result.id, { email: savedEmail });
+        }
+
+        // Mirror to Go server so the user is linkable to organizations
+        // (Issue #125). Best-effort — does not fail panel-side creation.
+        runBestEffortUserSync(() => userSync.mirrorCreate(username, password, userRole));
+
+        if (Object.prototype.hasOwnProperty.call(req.body || {}, 'folderIds') ||
+            Object.prototype.hasOwnProperty.call(req.body || {}, 'peerIds') ||
+            Object.prototype.hasOwnProperty.call(req.body || {}, 'strategyGuid')) {
+            await applyUserScopeFromBody(result.id, username, req.body);
+        }
+
+        // Log action
+        await db.logAction(req.session.userId, 'user_created', `Created user: ${username} (${userRole})`, req.ip);
+        
+        res.json({
+            success: true,
+            data: {
+                id: result.id,
+                username,
+                role: userRole,
+                email: savedEmail,
+                user_groups: groupGuids,
+                folder_ids: await userScopeService.getUserFolderIds(db, username),
+                peer_grants: await userScopeService.getUserPeerGrantIds(db, result.id)
+            }
+        });
+    } catch (err) {
+        console.error('Create user error:', err);
+        // Unique username race / constraint (SQLite UNIQUE, PG 23505 / users_username_key).
+        const msg = String(err.message || err.detail || '');
+        if (err.code === '23505' || /unique|users_username_key/i.test(msg)) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.username_exists')
+            });
+        }
+        res.status(err.status || 500).json({
+            success: false,
+            error: clientErrorMessage(err, req)
+        });
+    }
+});
+
+/**
+ * PATCH /api/users/:id - Update user (admin only)
+ */
+router.patch('/api/users/:id', requireAuth, requirePermission('user.edit'), async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        if (isNaN(userId) || userId <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid user ID' });
+        }
+        const { role, password, email } = req.body;
+        
+        const user = await db.getUserById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: req.t('users.not_found')
+            });
+        }
+
+        const provider = String(user.auth_provider || 'local').trim().toLowerCase();
+        const isExternalAccount = provider === 'ldap' || provider === 'oidc';
+
+        if (isExternalAccount && password) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.provider_managed_hint')
+            });
+        }
+        if (provider === 'ldap' && role) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.provider_managed_hint')
+            });
+        }
+
+        // Username change (issue #498, 2026-11-13). LDAP/OIDC accounts keep the
+        // name their provider issues; renaming them would make the next login
+        // recreate the old identity. The cascade (address book, org membership,
+        // strategy assignment, lockouts) runs in one transaction.
+        const nextUsername = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+        if (nextUsername && nextUsername !== user.username) {
+            if (isExternalAccount) {
+                return res.status(400).json({
+                    success: false,
+                    error: req.t('users.provider_managed_hint')
+                });
+            }
+            if (!USERS_USERNAME_RE.test(nextUsername)) {
+                return res.status(400).json({
+                    success: false,
+                    error: req.t('users.invalid_username')
+                });
+            }
+            const rename = await db.renameUser(userId, nextUsername);
+            if (!rename || rename.ok !== true) {
+                if (rename && rename.code === 'taken') {
+                    return res.status(409).json({
+                        success: false,
+                        error: req.t('users.username_exists')
+                    });
+                }
+                if (rename && rename.code === 'invalid') {
+                    return res.status(400).json({
+                        success: false,
+                        error: req.t('users.invalid_username')
+                    });
+                }
+                return res.status(404).json({
+                    success: false,
+                    error: req.t('users.not_found')
+                });
+            }
+
+            await db.logAction(
+                req.session.userId,
+                'user_renamed',
+                `Renamed user ${user.username} -> ${nextUsername}`,
+                req.ip
+            );
+            // Every credential minted under the old name must stop working.
+            try {
+                await authService.revokeUserSessionsAndTokens?.(userId);
+            } catch (_) { /* best effort; the Go side is authoritative */ }
+            runBestEffortUserSync(() => userSync.mirrorUpdate(nextUsername, {}));
+            user.username = nextUsername;
+        }
+        
+        // Prevent self-demotion from admin-level role
+        if (userId === req.session.userId && role && isSuperAdminRole(req.session.user.role) && !isSuperAdminRole(role)) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.cannot_demote_self')
+            });
+        }
+
+        // Refuse update before mutating the user when scope writers are missing (#380).
+        assertUserScopeWritersAvailable(req.body);
+        
+        // Update role if provided
+        if (role) {
+            if (!VALID_USER_ROLES.has(role)) {
+                return res.status(400).json({
+                    success: false,
+                    error: req.t('users.invalid_role')
+                });
+            }
+            if (!canAssignUserRole(req.session.user?.role, role)) {
+                return rejectUnauthorizedRoleAssignment(res);
+            }
+            await db.updateUserRole(userId, role);
+            // Mirror role change to Go (Issue #125)
+            runBestEffortUserSync(() => userSync.mirrorUpdate(user.username, { role }));
+        }
+        
+        // Update password if provided
+        if (password) {
+            const passwordCheck = authService.validatePasswordStrength(password);
+            if (passwordCheck.strength === 'weak') {
+                return res.status(400).json({
+                    success: false,
+                    error: req.t('users.weak_password'),
+                    feedback: passwordCheck.feedback
+                });
+            }
+            
+            const passwordHash = await authService.hashPassword(password);
+            await db.updateUserPassword(userId, passwordHash);
+            // Mirror password change to Go (Issue #125)
+            runBestEffortUserSync(() => userSync.mirrorUpdate(user.username, { password }));
+        }
+
+        await updateUserGroupMembershipsFromBody(userId, req.body);
+        await applyUserScopeFromBody(userId, user.username, req.body);
+
+        if (email !== undefined) {
+            const normalizedEmail = normalizeUserEmail(email);
+            await db.updateUserProfile(userId, { email: normalizedEmail });
+        }
+        
+        // Log action
+        await db.logAction(req.session.userId, 'user_updated', `Updated user: ${user.username}`, req.ip);
+
+        // Return refreshed scope so clients can verify peerIds/folderIds/strategy without a second GET (#380).
+        const updated = await db.getUserById(userId);
+        res.json({
+            success: true,
+            data: await serializeUserForList(updated || user)
+        });
+    } catch (err) {
+        console.error('Update user error:', err);
+        res.status(err.status || 500).json({
+            success: false,
+            error: clientErrorMessage(err, req)
+        });
+    }
+});
+
+/**
+ * GET /api/users/:id/effective-scope - Count devices visible to a user (admin).
+ */
+router.get('/api/users/:id/effective-scope', requireAuth, requirePermission('user.view'), async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        if (isNaN(userId) || userId <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid user ID' });
+        }
+        const user = await db.getUserById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, error: req.t('users.not_found') });
+        }
+        let devices = [];
+        try {
+            devices = await serverBackend.getAllDevices({});
+        } catch (_) {
+            devices = [];
+        }
+        const result = await userScopeService.countEffectiveScope(db, user, devices);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        console.error('Effective scope error:', err);
+        res.status(500).json({ success: false, error: req.t('errors.server_error') });
+    }
+});
+
+/**
+ * DELETE /api/users/:id - Delete user (admin only)
+ *
+ * Issue #315: on dual-SQLite, mirror delete to Go first (or refuse when Go
+ * still sees this as the last Super Admin). Never report success then let
+ * backfill resurrect the user. Username `admin` is not specially protected —
+ * installer reset-password.js can recreate it.
+ */
+router.delete('/api/users/:id', requireAuth, requirePermission('user.delete'), async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        if (isNaN(userId) || userId <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid user ID' });
+        }
+        
+        const user = await db.getUserById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: req.t('users.not_found')
+            });
+        }
+        
+        // Prevent self-deletion
+        if (userId === req.session.userId) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.cannot_delete_self')
+            });
+        }
+        
+        // Ensure at least one admin remains (local auth DB)
+        const adminCount = await db.countAdmins();
+        if (isSuperAdminRole(user.role) && adminCount <= 1) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.last_admin')
+            });
+        }
+
+        // Dual-SQLite: refuse before any mutation when Go would 409 (desync).
+        if (isSuperAdminRole(user.role)) {
+            const goGate = await userSync.assertGoAllowsSuperAdminDelete(user.username);
+            if (!goGate.ok) {
+                const status = goGate.status === 409 ? 409 : 502;
+                const errorKey = goGate.reason === 'last_admin_go'
+                    ? 'users.last_admin_go'
+                    : 'users.delete_mirror_failed';
+                return res.status(status).json({
+                    success: false,
+                    error: req.t(errorKey),
+                    code: goGate.reason || 'go_delete_blocked',
+                });
+            }
+        }
+
+        // Mirror to Go before local delete so a 409 cannot leave a false success.
+        // Shared PostgreSQL skips HTTP mirror (local delete removes the shared row).
+        const mirrorResult = await userSync.mirrorDelete(user.username);
+        if (!mirrorResult.ok) {
+            const status = mirrorResult.conflict ? 409 : (mirrorResult.status || 502);
+            const errorKey = mirrorResult.conflict
+                ? 'users.last_admin_go'
+                : 'users.delete_mirror_failed';
+            return res.status(status).json({
+                success: false,
+                error: req.t(errorKey),
+                code: mirrorResult.conflict ? 'last_admin_go' : 'delete_mirror_failed',
+            });
+        }
+
+        await panelAccessPolicyService.savePolicy('user', String(userId), {});
+        await db.deleteUser(userId);
+
+        // Log action
+        await db.logAction(req.session.userId, 'user_deleted', `Deleted user: ${user.username}`, req.ip);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Delete user error:', err);
+        res.status(500).json({
+            success: false,
+            error: req.t('errors.server_error')
+        });
+    }
+});
+
+/**
+ * POST /api/users/:id/reset-password - Admin reset user password
+ */
+router.post('/api/users/:id/reset-password', requireAuth, requirePermission('user.edit'), passwordChangeLimiter, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        if (isNaN(userId) || userId <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid user ID' });
+        }
+        const { newPassword } = req.body;
+        
+        const user = await db.getUserById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: req.t('users.not_found')
+            });
+        }
+        
+        if (!newPassword) {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.password_required')
+            });
+        }
+        
+        const passwordCheck = authService.validatePasswordStrength(newPassword);
+        if (passwordCheck.strength === 'weak') {
+            return res.status(400).json({
+                success: false,
+                error: req.t('users.weak_password'),
+                feedback: passwordCheck.feedback
+            });
+        }
+        
+        const passwordHash = await authService.hashPassword(newPassword);
+        await db.updateUserPassword(userId, passwordHash);
+
+        // Mirror password reset to Go (Issue #125)
+        runBestEffortUserSync(() => userSync.mirrorUpdate(user.username, { password: newPassword }));
+
+        // Log action
+        await db.logAction(req.session.userId, 'password_reset', `Reset password for user: ${user.username}`, req.ip);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Reset password error:', err);
+        res.status(500).json({
+            success: false,
+            error: req.t('errors.server_error')
+        });
+    }
+});
+
+// ---------------------------------------------------------------------------
+//  User-Org Linking (Issue #106)
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/users/:id/organizations - Get organizations a user belongs to
+ */
+router.get('/api/users/:id/organizations', requireAuth, requirePermission('user.view'), async (req, res) => {
+    try {
+        const goUserId = await resolveGoUserIdOrRespond(req, res);
+        if (!goUserId) return;
+        const safeGoUserId = assertSafeApiId(goUserId, 'userId');
+        goApiProxy(req, res, 'get', `/users/${encodeURIComponent(safeGoUserId)}/organizations`);
+    } catch (err) {
+        console.error('Resolve user organizations error:', err);
+        res.status(500).json({ success: false, error: req.t('errors.server_error') });
+    }
+});
+
+/**
+ * POST /api/users/:id/organizations - Assign user to an organization
+ */
+router.post('/api/users/:id/organizations', requireAuth, requirePermission('org.manage_users'), async (req, res) => {
+    try {
+        const goUserId = await resolveGoUserIdOrRespond(req, res);
+        if (!goUserId) return;
+        const safeGoUserId = assertSafeApiId(goUserId, 'userId');
+        goApiProxy(req, res, 'post', `/users/${encodeURIComponent(safeGoUserId)}/organizations`, req.body);
+    } catch (err) {
+        console.error('Assign user organization error:', err);
+        res.status(500).json({ success: false, error: req.t('errors.server_error') });
+    }
+});
+
+module.exports = router;

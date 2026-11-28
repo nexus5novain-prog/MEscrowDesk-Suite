@@ -1,0 +1,21 @@
+import type { TimeagoMessages } from '@/lib/timeago'
+
+export default {
+  now: '방금',
+  short: {
+    minutes: '{n}분',
+    hours: '{n}시간',
+    days: '{n}일',
+    weeks: '{n}주',
+    months: '{n}개월',
+    years: '{n}년',
+  },
+  long: {
+    minutes: '{n}분 전',
+    hours: '{n}시간 전',
+    days: '{n}일 전',
+    weeks: '{n}주 전',
+    months: '{n}개월 전',
+    years: '{n}년 전',
+  },
+} as const satisfies TimeagoMessages

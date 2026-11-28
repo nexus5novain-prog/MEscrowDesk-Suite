@@ -1,0 +1,22 @@
+package com.ismartcoding.plain.platform.system
+
+import kotlinx.serialization.Serializable
+
+@Serializable(with = DataTypeSerializer::class)
+enum class DataType(val value: Int) {
+    DEFAULT(0),
+    AUDIO(1),
+    VIDEO(2),
+    IMAGE(3),
+    SMS(4),
+    CONTACT(5),
+    NOTE(6),
+    FEED_ENTRY(7),
+    CALL(8),
+    PACKAGE(21),
+    FILE(22),
+    APP_FILE(23),
+    DOC(24),
+    ;
+
+}

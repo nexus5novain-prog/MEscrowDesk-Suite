@@ -1,0 +1,980 @@
+import { ref } from 'vue'
+import { GqlError } from './gql-error'
+import { gqlFetch } from './gql-client'
+import {
+  chatItemFragment,
+  chatChannelFragment,
+  feedEntryFragment,
+  feedFragment,
+  fileFragment,
+  noteFragment,
+  tagFragment,
+  bookmarkFragment,
+  bookmarkGroupFragment,
+  contactFragment,
+} from './fragments'
+
+// --- Mutation Wrapper ---
+
+export interface InitMutationParams {
+  document: string
+  origin?: boolean
+}
+
+export function initMutation(params: InitMutationParams, onFailure?: (error: unknown) => void) {
+  const loading = ref(false)
+  const doneCallbacks: Array<(result: any) => void> = []
+  const errorCallbacks: Array<(error: any) => void> = onFailure ? [onFailure] : []
+
+  async function mutate(variables?: any): Promise<any> {
+    loading.value = true
+    try {
+      const r = await gqlFetch(params.document, variables, { dedupe: false, ...(params.origin ? { origin: true } : {}) })
+      if (r.errors?.length) throw GqlError.fromGraphql(r.errors[0])
+      for (const cb of doneCallbacks) cb(r)
+      return r
+    } catch (e: any) {
+      if (e instanceof GqlError && e.canceled) return undefined
+      for (const cb of errorCallbacks) cb(e)
+      return undefined
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function onDone(fn: (result: any) => void) {
+    doneCallbacks.push(fn)
+    return { off: () => { const i = doneCallbacks.indexOf(fn); if (i >= 0) doneCallbacks.splice(i, 1) } }
+  }
+
+  function onError(fn: (error: any) => void) {
+    errorCallbacks.push(fn)
+    return { off: () => { const i = errorCallbacks.indexOf(fn); if (i >= 0) errorCallbacks.splice(i, 1) } }
+  }
+
+  return { mutate, loading, onDone, onError }
+}
+
+/**
+ * Wrap mutate into a Promise<boolean>.
+ * Returns true on success, false on error.
+ */
+export async function runMutation(
+  mutate: (variables?: any) => Promise<any>,
+  variables?: any,
+): Promise<boolean> {
+  const result = await mutate(variables)
+  return result != null
+}
+
+export const clearAppLogsGQL = `
+  mutation {
+    clearAppLogs
+  }
+`
+
+export const setPrefGQL = `
+  mutation setPref($key: String!, $value: JSON!) {
+    setPref(key: $key, value: $value)
+  }
+`
+
+export const updateDeviceNameGQL = `
+  mutation updateDeviceName($name: String!) {
+    updateDeviceName(name: $name)
+  }
+`
+
+// --- GraphQL Mutation Definitions ---
+
+export const forwardChatItemsGQL = `
+  mutation forwardChatItems($id: ID!, $targets: [String!]!, $note: String) {
+    forwardChatItems(id: $id, targets: $targets, note: $note) {
+      ...ChatItemFragment
+    }
+  }
+  ${chatItemFragment}
+`
+
+export const sendChatItemsGQL = `
+  mutation sendChatItems($targets: [String!]!, $content: ChatContentInput!) {
+    sendChatItems(targets: $targets, content: $content) {
+      ...ChatItemFragment
+    }
+  }
+  ${chatItemFragment}
+`
+
+export const deleteChatItemGQL = `
+  mutation deleteChatItem($id: ID!) {
+    deleteChatItem(id: $id)
+  }
+`
+
+export const deleteChatItemsGQL = `
+  mutation deleteChatItems($query: String!) {
+    deleteChatItems(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const retryChatItemGQL = `
+  mutation retryChatItem($id: ID!) {
+    retryChatItem(id: $id) {
+      ...ChatItemFragment
+    }
+  }
+  ${chatItemFragment}
+`
+export const createChatChannelGQL = `
+  mutation createChatChannel($name: String!) {
+    createChatChannel(name: $name) {
+      ...ChatChannelFragment
+    }
+  }
+  ${chatChannelFragment}
+`
+
+export const updateChatChannelGQL = `
+  mutation updateChatChannel($id: ID!, $name: String!) {
+    updateChatChannel(id: $id, name: $name) {
+      ...ChatChannelFragment
+    }
+  }
+  ${chatChannelFragment}
+`
+
+export const deleteChatChannelGQL = `
+  mutation deleteChatChannel($id: ID!) {
+    deleteChatChannel(id: $id)
+  }
+`
+
+export const deletePeerGQL = `
+  mutation deletePeer($peerId: ID!) {
+    deletePeer(peerId: $peerId)
+  }
+`
+
+export const unpairPeerGQL = `
+  mutation unpairPeer($peerId: ID!) {
+    unpairPeer(peerId: $peerId)
+  }
+`
+
+export const leaveChatChannelGQL = `
+  mutation leaveChatChannel($id: ID!) {
+    leaveChatChannel(id: $id)
+  }
+`
+
+export const addChatChannelMemberGQL = `
+  mutation addChatChannelMember($id: ID!, $peerId: ID!) {
+    addChatChannelMember(id: $id, peerId: $peerId) {
+      ...ChatChannelFragment
+    }
+  }
+  ${chatChannelFragment}
+`
+
+export const removeChatChannelMemberGQL = `
+  mutation removeChatChannelMember($id: ID!, $peerId: ID!) {
+    removeChatChannelMember(id: $id, peerId: $peerId) {
+      ...ChatChannelFragment
+    }
+  }
+  ${chatChannelFragment}
+`
+
+export const acceptChatChannelInviteGQL = `
+  mutation acceptChatChannelInvite($id: ID!) {
+    acceptChatChannelInvite(id: $id)
+  }
+`
+
+export const declineChatChannelInviteGQL = `
+  mutation declineChatChannelInvite($id: ID!) {
+    declineChatChannelInvite(id: $id)
+  }
+`
+
+export const createDirGQL = `
+  mutation createDir($path: String!) {
+    createDir(path: $path) {
+      ...FileFragment
+    }
+  }
+  ${fileFragment}
+`
+
+export const writeTextFileGQL = `
+  mutation writeTextFile($path: String!, $content: String!, $overwrite: Boolean!) {
+    writeTextFile(path: $path, content: $content, overwrite: $overwrite) {
+      ...FileFragment
+    }
+  }
+  ${fileFragment}
+`
+
+export const renameFileGQL = `
+  mutation renameFile($path: String!, $name: String!) {
+    renameFile(path: $path, name: $name)
+  }
+`
+
+export const copyFileToDirectoryGQL = `
+  mutation copyFileToDirectory($src: String!, $directory: String!, $name: String!) {
+    copyFileToDirectory(src: $src, directory: $directory, name: $name)
+  }
+`
+
+export const createFileTaskGQL = `
+  mutation createFileTask($type: FileTaskType!, $title: String!, $ops: [FileTaskOpInput!]!) {
+    createFileTask(type: $type, title: $title, ops: $ops, waitForCompletion: true) {
+      status
+      error
+    }
+  }
+`
+
+export const recordMediaPlayGQL = `
+  mutation recordMediaPlay($mediaId: ID!, $type: PlaybackType!, $positionMs: Long!) {
+    recordMediaPlay(mediaId: $mediaId, type: $type, positionMs: $positionMs)
+  }
+`
+
+export const saveMediaPlayProgressGQL = `
+  mutation saveMediaPlayProgress($mediaId: ID!, $type: PlaybackType!, $positionMs: Long!) {
+    saveMediaPlayProgress(mediaId: $mediaId, type: $type, positionMs: $positionMs)
+  }
+`
+
+export const selectAudioGQL = `
+  mutation selectAudio($mediaId: ID!) {
+    selectAudio(mediaId: $mediaId) {
+      mediaId
+    }
+  }
+`
+
+export const enqueueAndSelectAudioGQL = `
+  mutation enqueueAndSelectAudio($mediaId: ID!, $query: String!) {
+    addAudioToQueue(query: $query)
+    selectAudio(mediaId: $mediaId) {
+      mediaId
+    }
+  }
+`
+
+export const updateAudioPlayModeGQL = `
+  mutation updateAudioPlayMode($mode: MediaPlayMode!) {
+    updateAudioPlayMode(mode: $mode)
+  }
+`
+
+export const removeAudioFromQueueGQL = `
+  mutation removeAudioFromQueue($mediaId: ID!) {
+    removeAudioFromQueue(mediaId: $mediaId)
+  }
+`
+
+export const addAudioToQueueGQL = `
+  mutation addAudioToQueue($query: String!) {
+    addAudioToQueue(query: $query)
+  }
+`
+
+export const clearAudioQueueGQL = `
+  mutation clearAudioQueue {
+    clearAudioQueue
+  }
+`
+
+export const reorderAudioQueueGQL = `
+  mutation reorderAudioQueue($mediaIds: [ID!]!) {
+    reorderAudioQueue(mediaIds: $mediaIds)
+  }
+`
+
+export const deleteMediaItemsGQL = `
+  mutation deleteMediaItems($type: MediaDataType!, $query: String!) {
+    deleteMediaItems(type: $type, query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const trashMediaItemsGQL = `
+  mutation trashMediaItems($type: MediaDataType!, $query: String!) {
+    trashMediaItems(type: $type, query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const restoreMediaItemsGQL = `
+  mutation restoreMediaItems($type: MediaDataType!, $query: String!) {
+    restoreMediaItems(type: $type, query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const moveMediaItemsGQL = `
+  mutation moveMediaItems($type: MediaDataType!, $query: String!, $destDir: String!) {
+    moveMediaItems(type: $type, query: $query, destDir: $destDir) {
+      affectedCount
+    }
+  }
+`
+
+export const trashSmsGQL = `
+  mutation trashSms($query: String!) {
+    trashSms(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const restoreSmsGQL = `
+  mutation restoreSms($query: String!) {
+    restoreSms(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const deleteSmsGQL = `
+  mutation deleteSms($query: String!) {
+    deleteSms(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const removeFromTagsGQL = `
+  mutation removeFromTags($type: DataType!, $tagIds: [ID!]!, $query: String!) {
+    removeFromTags(type: $type, tagIds: $tagIds, query: $query)
+  }
+`
+
+export const addToTagsGQL = `
+  mutation addToTags($type: DataType!, $tagIds: [ID!]!, $query: String!) {
+    addToTags(type: $type, tagIds: $tagIds, query: $query)
+  }
+`
+
+export const updateTagRelationsGQL = `
+  mutation updateTagRelations($type: DataType!, $keys: [String!]!, $addTagIds: [ID!]!, $removeTagIds: [ID!]!) {
+    updateTagRelations(type: $type, keys: $keys, addTagIds: $addTagIds, removeTagIds: $removeTagIds)
+  }
+`
+
+export const createTagGQL = `
+  mutation createTag($type: DataType!, $name: String!) {
+    createTag(type: $type, name: $name) {
+      ...TagFragment
+    }
+  }
+  ${tagFragment}
+`
+
+export const updateTagGQL = `
+  mutation updateTag($id: ID!, $name: String!) {
+    updateTag(id: $id, name: $name) {
+      ...TagFragment
+    }
+  }
+  ${tagFragment}
+`
+
+export const deleteTagGQL = `
+  mutation deleteTag($id: ID!) {
+    deleteTag(id: $id)
+  }
+`
+
+export const addFavoriteFolderGQL = `
+  mutation addFavoriteFolder($rootPath: String!, $fullPath: String!) {
+    addFavoriteFolder(rootPath: $rootPath, fullPath: $fullPath) {
+      rootPath
+      fullPath
+    }
+  }
+`
+
+export const removeFavoriteFolderGQL = `
+  mutation removeFavoriteFolder($fullPath: String!) {
+    removeFavoriteFolder(fullPath: $fullPath) {
+      rootPath
+      fullPath
+      alias
+    }
+  }
+`
+
+export const setMountAliasGQL = `
+  mutation setMountAlias($id: ID!, $alias: String!) {
+    setMountAlias(id: $id, alias: $alias)
+  }
+`
+
+export const setFavoriteFolderAliasGQL = `
+  mutation setFavoriteFolderAlias($fullPath: String!, $alias: String!) {
+    setFavoriteFolderAlias(fullPath: $fullPath, alias: $alias) {
+      rootPath
+      fullPath
+      alias
+    }
+  }
+`
+
+export const createNoteGQL = `
+  mutation createNote($input: NoteInput!) {
+    createNote(input: $input) {
+      ...NoteFragment
+    }
+  }
+  ${noteFragment}
+`
+
+export const updateNoteGQL = `
+  mutation updateNote($id: ID!, $input: NoteInput!) {
+    updateNote(id: $id, input: $input) {
+      ...NoteFragment
+    }
+  }
+  ${noteFragment}
+`
+
+export const deleteNotesGQL = `
+  mutation deleteNotes($query: String!) {
+    deleteNotes(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const trashNotesGQL = `
+  mutation trashNotes($query: String!) {
+    trashNotes(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const restoreNotesGQL = `
+  mutation restoreNotes($query: String!) {
+    restoreNotes(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const deleteFeedEntriesGQL = `
+  mutation deleteFeedEntries($query: String!) {
+    deleteFeedEntries(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const deleteCallsGQL = `
+  mutation deleteCalls($query: String!) {
+    deleteCalls(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const deleteContactsGQL = `
+  mutation deleteContacts($query: String!) {
+    deleteContacts(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const createFeedGQL = `
+  mutation createFeed($url: String!, $fetchContent: Boolean!) {
+    createFeed(url: $url, fetchContent: $fetchContent) {
+      ...FeedFragment
+    }
+  }
+  ${feedFragment}
+`
+
+export const importFeedsGQL = `
+  mutation importFeeds($content: String!) {
+    importFeeds(content: $content)
+  }
+`
+
+
+
+export const relaunchAppGQL = `
+  mutation relaunchApp {
+    relaunchApp
+  }
+`
+
+export const openAccessibilitySettingsGQL = `
+  mutation openAccessibilitySettings {
+    openAccessibilitySettings
+  }
+`
+
+export const requestAccessGQL = `
+  mutation requestAccess($feature: AccessFeature!) {
+    requestAccess(feature: $feature)
+  }
+`
+
+export const deleteFeedGQL = `
+  mutation deleteFeed($id: ID!) {
+    deleteFeed(id: $id)
+  }
+`
+
+export const updateFeedGQL = `
+  mutation updateFeed($id: ID!, $name: String!, $fetchContent: Boolean!) {
+    updateFeed(id: $id, name: $name, fetchContent: $fetchContent) {
+      ...FeedFragment
+    }
+  }
+  ${feedFragment}
+`
+
+export const syncFeedsGQL = `
+  mutation syncFeeds($id: ID) {
+    syncFeeds(id: $id)
+  }
+`
+
+export const syncFeedEntryContentGQL = `
+  mutation syncFeedEntryContent($id: ID!) {
+    syncFeedEntryContent(id: $id) {
+      ...FeedEntryFragment
+      feed {
+        ...FeedFragment
+      }
+    }
+  }
+  ${feedFragment}
+  ${feedEntryFragment}
+`
+
+export const callGQL = `
+  mutation call($number: String!, $showDialer: Boolean!) {
+    call(number: $number, showDialer: $showDialer)
+  }
+`
+
+export const setClipboardGQL = `
+  mutation setClipboard($text: String!) {
+    setClipboard(text: $text)
+  }
+`
+
+export const sendSmsGQL = `
+  mutation sendSms($number: String!, $body: String!, $attachmentPaths: [String!]! = [], $subscriptionId: Int, $requestId: String!) {
+    sendSms(number: $number, body: $body, attachmentPaths: $attachmentPaths, subscriptionId: $subscriptionId, requestId: $requestId) {
+      requestId
+      requiresConfirmation
+    }
+  }
+`
+
+export const archiveSmsConversationGQL = `
+  mutation archiveSmsConversation($id: ID!) {
+    archiveSmsConversation(id: $id)
+  }
+`
+
+export const unarchiveSmsConversationGQL = `
+  mutation unarchiveSmsConversation($id: ID!) {
+    unarchiveSmsConversation(id: $id)
+  }
+`
+
+export const uninstallPackagesGQL = `
+  mutation uninstallPackages($ids: [ID!]!) {
+    uninstallPackages(ids: $ids)
+  }
+`
+
+export const uninstallPackageGQL = `
+  mutation uninstallPackages($id: ID!) {
+    uninstallPackages(ids: [$id])
+  }
+`
+
+export const installPackageGQL = `
+  mutation installPackage($path: String!) {
+    installPackage(path: $path) {
+      id
+      updatedAt
+      isNew
+    }
+  }
+`
+
+export const startScreenMirrorGQL = `
+  mutation startScreenMirror($audio: Boolean!) {
+    startScreenMirror(audio: $audio)
+  }
+`
+
+export const requestScreenMirrorAudioGQL = `
+  mutation requestScreenMirrorAudio {
+    requestScreenMirrorAudio
+  }
+`
+
+export const stopScreenMirrorGQL = `
+  mutation stopScreenMirror {
+    stopScreenMirror
+  }
+`
+
+export const setTempValueGQL = `
+  mutation setTempValue($key: String!, $value: String!) {
+    setTempValue(key: $key, value: $value) {
+      key
+      value
+    }
+  }
+`
+
+export const deleteNotificationsGQL = `
+  mutation deleteNotifications($ids: [ID!]!) {
+    deleteNotifications(ids: $ids) {
+      affectedCount
+    }
+  }
+`
+
+export const replyNotificationGQL = `
+  mutation replyNotification($id: ID!, $actionIndex: Int!, $text: String!) {
+    replyNotification(id: $id, actionIndex: $actionIndex, text: $text)
+  }
+`
+
+export const deleteClipboardItemsGQL = `
+  mutation deleteClipboardItems($query: String!) {
+    deleteClipboardItems(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const updateScreenMirrorQualityGQL = `
+  mutation updateScreenMirrorQuality($mode: ScreenMirrorMode!) {
+    updateScreenMirrorQuality(mode: $mode)
+  }
+`
+
+export const saveFeedEntriesToNotesGQL = `
+  mutation saveFeedEntriesToNotes($query: String!) {
+    saveFeedEntriesToNotes(query: $query)
+  }
+`
+
+export const mergeChunksGQL = `
+  mutation mergeChunks($fileId: String!, $totalChunks: Int!, $path: String!, $replace: Boolean!, $totalSize: Long!) {
+    mergeChunks(fileId: $fileId, totalChunks: $totalChunks, path: $path, replace: $replace, totalSize: $totalSize) {
+      status
+      value
+      mergedSize
+      error
+    }
+  }
+`
+
+export const mergeAppFileChunksGQL = `
+  mutation mergeAppFileChunks($fileId: String!, $totalChunks: Int!, $fileName: String!, $totalSize: Long!) {
+    mergeAppFileChunks(fileId: $fileId, totalChunks: $totalChunks, fileName: $fileName, totalSize: $totalSize) {
+      status
+      value
+      mergedSize
+      error
+    }
+  }
+`
+
+export const deleteChunksGQL = `
+  mutation deleteChunks($fileId: String!) {
+    deleteChunks(fileId: $fileId)
+  }
+`
+
+export const startPomodoroGQL = `
+  mutation startPomodoro($durationSec: Int!) {
+    startPomodoro(durationSec: $durationSec) { date completedCount currentRound timeLeftSec totalTimeSec isRunning isPaused state }
+  }
+`
+
+export const stopPomodoroGQL = `
+  mutation stopPomodoro {
+    stopPomodoro { date completedCount currentRound timeLeftSec totalTimeSec isRunning isPaused state }
+  }
+`
+
+export const pausePomodoroGQL = `
+  mutation pausePomodoro {
+    pausePomodoro { date completedCount currentRound timeLeftSec totalTimeSec isRunning isPaused state }
+  }
+`
+
+export const logoutGQL = `mutation logout { logout }`
+
+export const importBookmarksGQL = `
+  mutation importBookmarks($content: String!) {
+    importBookmarks(content: $content) { affectedCount }
+  }
+`
+
+export const addBookmarksGQL = `
+  mutation addBookmarks($urls: [String!]!, $groupId: ID!) {
+    addBookmarks(urls: $urls, groupId: $groupId) {
+      ...BookmarkFragment
+    }
+  }
+  ${bookmarkFragment}
+`
+
+export const updateBookmarkGQL = `
+  mutation updateBookmark($id: ID!, $input: BookmarkInput!) {
+    updateBookmark(id: $id, input: $input) {
+      ...BookmarkFragment
+    }
+  }
+  ${bookmarkFragment}
+`
+
+export const deleteBookmarksGQL = `
+  mutation deleteBookmarks($ids: [ID!]!) {
+    deleteBookmarks(ids: $ids) {
+      affectedCount
+    }
+  }
+`
+
+export const recordBookmarkClickGQL = `
+  mutation recordBookmarkClick($id: ID!) {
+    recordBookmarkClick(id: $id)
+  }
+`
+
+export const createBookmarkGroupGQL = `
+  mutation createBookmarkGroup($name: String!) {
+    createBookmarkGroup(name: $name) {
+      ...BookmarkGroupFragment
+    }
+  }
+  ${bookmarkGroupFragment}
+`
+
+export const updateBookmarkGroupGQL = `
+  mutation updateBookmarkGroup($id: ID!, $name: String!, $collapsed: Boolean!, $sortOrder: Int!) {
+    updateBookmarkGroup(id: $id, name: $name, collapsed: $collapsed, sortOrder: $sortOrder) {
+      ...BookmarkGroupFragment
+    }
+  }
+  ${bookmarkGroupFragment}
+`
+
+export const deleteBookmarkGroupGQL = `
+  mutation deleteBookmarkGroup($id: ID!) {
+    deleteBookmarkGroup(id: $id)
+  }
+`
+
+export const trashFilesGQL = `
+  mutation trashFiles($paths: [String!]!) {
+    trashFiles(paths: $paths) { affectedCount }
+  }
+`
+
+export const restoreFilesGQL = `
+  mutation restoreFiles($paths: [String!]!) {
+    restoreFiles(paths: $paths) { affectedCount }
+  }
+`
+
+export const deleteTrashedFilesGQL = `
+  mutation deleteTrashedFiles($paths: [String!]!) { deleteTrashedFiles(paths: $paths) { affectedCount } }
+`
+
+export const deleteFilesGQL = `
+  mutation deleteFiles($paths: [String!]!) {
+    deleteFiles(paths: $paths) {
+      affectedCount
+    }
+  }
+`
+
+export const importImageSearchModelGQL = `
+  mutation { importImageSearchModel }
+`
+
+export const enableImageSearchGQL = `
+  mutation { enableImageSearch }
+`
+
+export const disableImageSearchGQL = `
+  mutation { disableImageSearch }
+`
+
+export const cancelImageModelDownloadGQL = `
+  mutation { cancelImageModelDownload }
+`
+
+export const startImageIndexGQL = `
+  mutation startImageIndex($force: Boolean) {
+    startImageIndex(force: $force)
+  }
+`
+
+export const cancelImageIndexGQL = `
+  mutation { cancelImageIndex }
+`
+
+export const createContactGQL = `
+  mutation createContact($input: ContactInput!) {
+    createContact(input: $input) {
+      ...ContactFragment
+    }
+  }
+  ${contactFragment}
+`
+
+export const updateContactGQL = `
+  mutation updateContact($id: ID!, $input: ContactInput!) {
+    updateContact(id: $id, input: $input) {
+      ...ContactFragment
+    }
+  }
+  ${contactFragment}
+`
+
+export const deleteContactGQL = `
+  mutation DeleteContact($query: String!) {
+    deleteContacts(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const deleteCallGQL = `
+  mutation DeleteCall($query: String!) {
+    deleteCalls(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const deleteNoteGQL = `
+  mutation DeleteNote($query: String!) {
+    deleteNotes(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const deleteFeedEntryGQL = `
+  mutation deleteFeedEntry($query: String!) {
+    deleteFeedEntries(query: $query) {
+      affectedCount
+    }
+  }
+`
+
+export const removePrefGQL = `
+  mutation removePref($key: String!) {
+    removePref(key: $key)
+  }
+`
+
+export const createDbTableRowGQL = `
+  mutation CreateDbTableRow($table: String!, $row: JSON!) {
+    createDbTableRow(table: $table, row: $row)
+  }
+`
+
+export const deleteDbTableRowsGQL = `
+  mutation DeleteDbTableRows($table: String!, $ids: [String!]!) {
+    deleteDbTableRows(table: $table, ids: $ids)
+  }
+`
+
+export const startDiscoveryGQL = `
+  mutation StartDiscovery {
+    startDiscovery
+  }
+`
+
+export const stopDiscoveryGQL = `
+  mutation StopDiscovery {
+    stopDiscovery
+  }
+`
+
+export const pairPeerGQL = `
+  mutation PairDevice($peerId: ID!, $input: PairPeerInput!) {
+    pairPeer(peerId: $peerId, input: $input)
+  }
+`
+
+export const cancelPairingGQL = `
+  mutation cancelPairing($peerId: ID!) {
+    cancelPairing(peerId: $peerId)
+  }
+`
+
+export const respondToPairingGQL = `
+  mutation respondToPairing($peerId: ID!, $accepted: Boolean!) {
+    respondToPairing(peerId: $peerId, accepted: $accepted)
+  }
+`
+
+export const createDownloadGQL = `
+  mutation createDownload($input: DownloadInput!) {
+    createDownload(input: $input) { id }
+  }
+`
+
+export const pauseDownloadGQL = `
+  mutation pauseDownload($id: ID!) { pauseDownload(id: $id) }
+`
+export const resumeDownloadGQL = `
+  mutation resumeDownload($id: ID!) { resumeDownload(id: $id) }
+`
+export const retryDownloadGQL = `
+  mutation retryDownload($id: ID!) { retryDownload(id: $id) }
+`
+export const cancelDownloadGQL = `
+  mutation cancelDownload($id: ID!) { cancelDownload(id: $id) }
+`
+export const removeDownloadGQL = `
+  mutation removeDownload($id: ID!) { removeDownload(id: $id) }
+`
+
+export const pauseFileIndexGQL = `
+  mutation pauseFileIndex($volumeId: ID) { pauseFileIndex(volumeId: $volumeId) }
+`
+
+export const resumeFileIndexGQL = `
+  mutation resumeFileIndex($volumeId: ID) { resumeFileIndex(volumeId: $volumeId) }
+`
+
+export const stopFileIndexGQL = `
+  mutation stopFileIndex($volumeId: ID) { stopFileIndex(volumeId: $volumeId) }
+`
+
+export const formatDiskGQL = `
+  mutation formatDisk($path: String!) {
+    formatDisk(path: $path)
+  }
+`

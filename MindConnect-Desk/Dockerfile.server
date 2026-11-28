@@ -1,0 +1,90 @@
+# Dockerfile for BetterDesk Server (Go)
+# Multi-stage build: compile from source, then copy to minimal runtime image
+#
+# The BetterDesk server is a single binary that replaces both hbbs and hbbr.
+# It provides: signal (UDP/TCP/WS), relay (TCP/WS), HTTP API, admin console.
+#
+# Build: docker build -f Dockerfile.server -t betterdesk-server:local .
+
+# ---- Build stage ----
+FROM golang:1.26.11-alpine AS builder
+ARG TARGETARCH
+
+RUN apk add --no-cache git || { sleep 2 && apk add --no-cache git; }
+
+WORKDIR /src
+
+# Copy Go module files first (cache dependencies)
+COPY betterdesk-server/go.mod betterdesk-server/go.sum ./
+
+RUN go mod download
+
+# Copy full source
+COPY betterdesk-server/ .
+
+ARG BETTERDESK_PRODUCT_VERSION=dev
+
+# Build static binary (modernc.org/sqlite is pure Go — no CGO needed)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
+    -ldflags="-s -w -X main.Version=${BETTERDESK_PRODUCT_VERSION}" \
+    -tags "netgo osusergo" \
+    -o /betterdesk-server .
+
+# ---- Runtime stage ----
+FROM alpine:3.22
+
+LABEL maintainer="UNITRONIX"
+LABEL description="BetterDesk Server - RustDesk-compatible signal + relay"
+LABEL version="3.5.272"
+
+RUN apk add --no-cache \
+    ca-certificates \
+    curl \
+    sqlite \
+    tini \
+    su-exec \
+    shadow \
+    || { sleep 2 && apk add --no-cache \
+    ca-certificates curl sqlite tini su-exec shadow; } \
+    && addgroup -g 10001 -S betterdesk \
+    && adduser -u 10001 -S -G betterdesk betterdesk
+
+COPY --from=builder /betterdesk-server /usr/local/bin/betterdesk-server
+RUN chmod +x /usr/local/bin/betterdesk-server
+
+# Create data directory before writing build metadata into it
+RUN mkdir -p /opt/rustdesk && chown betterdesk:betterdesk /opt/rustdesk
+
+ARG BETTERDESK_COMMIT_SHA=unknown
+ARG BETTERDESK_IMAGE_VERSION=unknown
+ENV BETTERDESK_IMAGE_SHA=${BETTERDESK_COMMIT_SHA}
+ENV BETTERDESK_IMAGE_VERSION=${BETTERDESK_IMAGE_VERSION}
+RUN printf '%s\n' "${BETTERDESK_COMMIT_SHA}" > /opt/rustdesk/.image-commit
+
+# Entrypoint script: fixes volume permissions, then drops to betterdesk user
+COPY docker/ensure-app-user.sh /ensure-app-user.sh
+COPY docker/server-entrypoint.sh /server-entrypoint.sh
+COPY docker/bootstrap-admin-credentials.sh /docker/bootstrap-admin-credentials.sh
+COPY docker/show-admin-credentials.sh /usr/local/bin/betterdesk-show-admin-credentials
+RUN chmod +x /ensure-app-user.sh /server-entrypoint.sh /docker/bootstrap-admin-credentials.sh /usr/local/bin/betterdesk-show-admin-credentials
+
+WORKDIR /opt/rustdesk
+
+# Ports:
+# 21121 - HTTP API (RustDesk client API + REST)
+# 21115 - NAT type test
+# 21116 - Signal (TCP+UDP)
+# 21117 - Relay (TCP)
+# 21118 - WebSocket Signal
+# 21119 - WebSocket Relay
+EXPOSE 21115 21116/tcp 21116/udp 21117 21118 21119 21121
+
+# Health check via API
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -sf http://localhost:21121/api/health || exit 1
+
+# Note: Container starts as root so entrypoint can fix volume permissions.
+# server-entrypoint.sh drops to betterdesk user via su-exec before running the server.
+
+ENTRYPOINT ["/sbin/tini", "--", "/server-entrypoint.sh"]
+CMD ["/usr/local/bin/betterdesk-server", "-mode", "all", "-key-file", "/opt/rustdesk/id_ed25519"]

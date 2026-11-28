@@ -1,0 +1,74 @@
+import { isLocalMode } from '@/lib/device/local-mode'
+import { createApp } from 'vue'
+import App from '@/App.vue'
+import router from '@/plugins/router'
+import '@/styles/main.scss'
+import { createPinia } from 'pinia'
+import VueClickAway from '@/plugins/clickaway'
+import VueTooltip from '@/plugins/tooltip'
+import VueRipple from '@/plugins/ripple'
+import { getIsPhone, getIsTablet } from '@/hooks/device'
+import { setLocalServerPort, setUrlToken, setLocalServerHttpsPort } from '@/lib/api/api'
+import { preload as preloadPrefs } from '@/lib/prefs/core'
+import { applyUrlClientId, ensureBrowserClientId, getDesktopClientId, preloadClientIdentity } from '@/lib/device/client-id'
+import { preloadLoginPeers } from '@/lib/device/login-peers'
+import { applyMenuLabels } from '@/lib/app-menu'
+import { preventUnhandledFileDrop } from '@/lib/file-drop'
+import { readLocalServer } from '@/lib/api/local-server'
+
+export async function bootstrapFullApp(): Promise<void> {
+  if (!__IS_TAURI__) {
+    ensureBrowserClientId()
+    applyUrlClientId()
+  }
+  if (__IS_TAURI__) {
+    document.documentElement.classList.add('tauri')
+    preventUnhandledFileDrop()
+    await preloadClientIdentity()
+    if (!getDesktopClientId()) throw new Error('Missing core client identity')
+    // Resolve child-window device bindings only after loading the local client identity.
+    applyUrlClientId()
+    const [server] = await Promise.all([readLocalServer(), preloadLoginPeers()])
+    setLocalServerPort(server.httpPort)
+    setLocalServerHttpsPort(server.httpsPort)
+    setUrlToken(server.urlToken)
+    if (isLocalMode()) await preloadPrefs()
+  }
+
+  // Dynamically import i18n AFTER prefs are loaded so createI18n() reads
+  // the persisted locale from the prefs cache instead of localStorage.
+  const i18nModule = await import('@/plugins/i18n')
+  const i18n = i18nModule.default
+  const { loadLocaleMessages, syncLocaleFromPrefs } = i18nModule
+
+  // The initialLocale IIFE inside i18n.ts reads from the in-memory cache at
+  // module-import time. As a safety net, re-verify the persisted locale
+  // here and correct it before any locale-dependent code runs.
+  const locale = syncLocaleFromPrefs()
+
+  // Pre-load the persisted locale's chunk synchronously so the first
+  // render shows the right translations instead of the en-US fallback.
+  // Other locales stay on disk until the user switches to them.
+  const { setLocale: setTimeagoLocale } = await import('@/lib/timeago')
+  await Promise.all([loadLocaleMessages(locale), setTimeagoLocale(locale)])
+
+  if (__IS_TAURI__) {
+    applyMenuLabels()
+  }
+
+  createApp(App).use(VueClickAway).use(VueTooltip).use(VueRipple).use(createPinia()).use(router).use(i18n).provide('isPhone', getIsPhone()).provide('isTablet', getIsTablet()).mount('#app')
+
+  // Pre-warm the media preview window 2s after the main window finishes
+  // mounting. The delay keeps the cold-start critical path snappy and
+  // moves the cost (creating a hidden webview, loading the SPA once
+  // inside it) out of the user's first click.
+  if (__IS_TAURI__) {
+    setTimeout(() => {
+      import('@/lib/api/native-invoke').then(({ invoke }) => {
+        invoke('media_preview_init').catch((e) => {
+          console.warn('media_preview_init failed', e)
+        })
+      })
+    }, 2000)
+  }
+}

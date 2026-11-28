@@ -1,0 +1,64 @@
+package com.ismartcoding.plain.platform.media
+
+
+import com.ismartcoding.plain.features.audio.AudioCommands
+import com.ismartcoding.plain.models.AudioCommand
+import com.ismartcoding.plain.models.AudioItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
+
+expect fun checkAudioPlaybackPermission(onGranted: () -> Unit)
+
+interface AudioPlayer {
+    val isPlayingFlow: StateFlow<Boolean>
+    val currentPath: String
+    fun bindRevision(revision: Long)
+    suspend fun load(audio: AudioItem, positionMs: Long, speed: Float, revision: Long)
+    val progress: Long
+    suspend fun seekTo(positionMs: Long)
+    suspend fun pause()
+    suspend fun play()
+    suspend fun restartIfPlaying()
+    suspend fun clear()
+    suspend fun setPlaybackSpeed(speed: Float)
+}
+
+expect fun createAudioPlayer(): AudioPlayer
+
+internal val audioPlayer: AudioPlayer by lazy { createAudioPlayer() }
+
+fun audioIsPlayingFlow(): StateFlow<Boolean> = audioPlayer.isPlayingFlow
+
+fun audioPlayerProgress(): Long = audioPlayer.progress
+
+/** Suspending read for non-main threads (e.g. the HTTP server): the Android player is a Media3 MediaController which only allows calls on the app thread. */
+suspend fun audioPlayerProgressAsync(): Long = withContext(Dispatchers.Main) { audioPlayer.progress }
+
+fun audioSeekTo(positionMs: Long) = AudioCommands.submit(AudioCommand.SEEK, positionMs = positionMs)
+
+fun audioPause() = AudioCommands.submit(AudioCommand.PAUSE)
+
+fun audioPlay() = AudioCommands.submit(AudioCommand.PLAY)
+
+fun restartAudioIfPlaying() = AudioCommands.submit(AudioCommand.RESTART)
+
+fun playAudioWithPermissionCheck(path: String, source: com.ismartcoding.plain.rust.graphql.ContentSource = com.ismartcoding.plain.rust.graphql.ContentSource.Local) {
+    checkAudioPlaybackPermission {
+        AudioCommands.playPath(path, source)
+    }
+}
+
+fun audioJustPlay(audio: AudioItem) = AudioCommands.playTrack(audio)
+
+fun audioJustPlayWithPermissionCheck(audio: AudioItem, source: com.ismartcoding.plain.rust.graphql.ContentSource = com.ismartcoding.plain.rust.graphql.ContentSource.Local) {
+    checkAudioPlaybackPermission {
+        AudioCommands.playTrack(audio, source)
+    }
+}
+
+fun audioSkipToPrevious() = AudioCommands.submit(AudioCommand.PREVIOUS)
+
+fun audioSkipToNext() = AudioCommands.submit(AudioCommand.NEXT)
+
+fun audioSetPlaybackSpeed(speed: Float) = AudioCommands.submit(AudioCommand.SET_SPEED, speed = speed)

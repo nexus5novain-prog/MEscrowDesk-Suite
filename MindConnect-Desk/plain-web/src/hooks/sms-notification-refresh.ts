@@ -1,0 +1,100 @@
+import { graphqlSubscriptions } from '@/lib/api/subscription-client'
+
+export const SMS_NOTIFICATION_REFRESH_DELAY_MS = 500
+const MAX_REFRESH_DELAY_MS = 2000
+
+export function createSmsNotificationRefresh(refresh: () => void | Promise<unknown>, reconnect?: () => void) {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  let maximumTimeout: ReturnType<typeof setTimeout> | undefined
+  let subscribed = false
+  let refreshing = false
+  let refreshQueued = false
+
+  let stopSendResult: (() => void) | undefined
+  let stopSmsChanged: (() => void) | undefined
+  let stopAttached: (() => void) | undefined
+
+  function finishRefresh() {
+    refreshing = false
+    if (subscribed && refreshQueued) {
+      refreshQueued = false
+      handleSmsChanged()
+    }
+  }
+
+  function refreshOnce() {
+    if (!subscribed) return
+    if (refreshing) {
+      refreshQueued = true
+      return
+    }
+    refreshing = true
+    try {
+      const result = refresh()
+      if (result) {
+        void result.then(finishRefresh, () => {
+          console.error('SMS refresh failed')
+          finishRefresh()
+        })
+      } else {
+        finishRefresh()
+      }
+    } catch (error) {
+      finishRefresh()
+      throw error
+    }
+  }
+
+  function clearScheduledRefresh() {
+    if (timeout) clearTimeout(timeout)
+    if (maximumTimeout) clearTimeout(maximumTimeout)
+    timeout = undefined
+    maximumTimeout = undefined
+  }
+
+  function flush() {
+    clearScheduledRefresh()
+    refreshOnce()
+  }
+
+  function handleSmsChanged() {
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(flush, SMS_NOTIFICATION_REFRESH_DELAY_MS)
+    maximumTimeout ??= setTimeout(flush, MAX_REFRESH_DELAY_MS)
+  }
+
+  function handleResume() {
+    if (document.visibilityState === 'visible') handleSmsChanged()
+  }
+
+  function handleConnectionChanged() {
+    refreshOnce()
+    reconnect?.()
+  }
+
+  function subscribe() {
+    if (subscribed) return
+    subscribed = true
+    stopSmsChanged = graphqlSubscriptions.subscribe('smsChanged', handleSmsChanged)
+    stopSendResult = graphqlSubscriptions.subscribe('smsSendResult', (result) => { if (result.success) handleSmsChanged() })
+    stopAttached = graphqlSubscriptions.onAttached(handleConnectionChanged)
+    document.addEventListener('visibilitychange', handleResume)
+    window.addEventListener('focus', handleResume)
+    window.addEventListener('online', handleResume)
+  }
+
+  function unsubscribe() {
+    if (!subscribed) return
+    subscribed = false
+    refreshQueued = false
+    stopSmsChanged?.()
+    stopSendResult?.()
+    stopAttached?.()
+    document.removeEventListener('visibilitychange', handleResume)
+    window.removeEventListener('focus', handleResume)
+    window.removeEventListener('online', handleResume)
+    clearScheduledRefresh()
+  }
+
+  return { subscribe, unsubscribe }
+}

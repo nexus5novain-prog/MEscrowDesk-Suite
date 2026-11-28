@@ -1,0 +1,197 @@
+name: BetterDesk CodeQL
+
+# Dev-only tooling and test harnesses are not production attack surface.
+paths-ignore:
+  - web-nodejs/tests
+  - web-nodejs/scripts/dev-i18n
+  - web-nodejs/scripts/patch-role-scope-i18n.js
+  - scripts/bump-version.js
+  - scripts/local-gate.js
+  - betterdesk-mgmt
+  # MeshAgent tunnel TLS pin (checkServerIdentity); not default chain validation.
+  - betterdesk-server/meshcentral/assets/bettercore.js
+  # EJS layout slot; child views escape user data with <%=
+  - web-nodejs/views/layouts/main.ejs
+  # Vendored wry cookie read helpers (copy Secure from platform cookies).
+  - rdclient-desktop/vendor/wry/**
+
+query-filters:
+  # --- Path sinks after safePath / basename confinement / admin-validated roots ---
+  # (Default setup ignores this file; keep for advanced workflow + documentation.)
+  - exclude:
+      id: js/path-injection
+      paths:
+        - web-nodejs/lib/safePath.js
+        - web-nodejs/lib/multerCleanup.js
+        - web-nodejs/services/updateService.js
+        - web-nodejs/services/i18nService.js
+        - web-nodejs/services/scheduledBackupService.js
+        - web-nodejs/routes/tickets.routes.js
+        - web-nodejs/routes/settings.routes.js
+        - web-nodejs/routes/generator.routes.js
+        - web-nodejs/services/serverManagement.js
+        - web-nodejs/tests/**
+
+  # --- Intentional admin-only terminal I/O (super_admin / server_admin) ---
+  - exclude:
+      id: js/code-injection
+      paths:
+        - web-nodejs/services/serverTerminalProxy.js
+
+  # --- Client-side fetch restricted to same-origin relative API paths ---
+  - exclude:
+      id: js/request-forgery
+      paths:
+        - web-nodejs/public/js/utils.js
+        # GitHub API downloads; URL built from configured owner/repo/ref, not raw request body
+        - web-nodejs/services/supportGeneratorModule.js
+
+  # --- OIDC discovery/test fetch with SSRF validation (validateOIDCFetchURL + DNS resolve) ---
+  - exclude:
+      id: go/request-forgery
+      paths:
+        - betterdesk-server/auth/oidc_url.go
+
+  # --- Local diagnostic gate only (never production) ---
+  - exclude:
+      id: js/shell-command-injection-from-environment
+      paths:
+        - scripts/local-gate.js
+        - web-nodejs/services/localClientBuilder.js
+
+  - exclude:
+      id: js/incomplete-sanitization
+      paths:
+        - scripts/local-gate.js
+
+  # --- Format strings are fixed templates; IDs only interpolated after validation ---
+  - exclude:
+      id: js/tainted-format-string
+      paths:
+        - web-nodejs/routes/devices.routes.js
+
+  # --- Admin file download; auth + rate limit elsewhere on generator API ---
+  - exclude:
+      id: js/missing-rate-limiting
+      paths:
+        - web-nodejs/routes/phase4_5.routes.js
+
+  # --- Nonce / ephemeral client ID; not auth secret material ---
+  - exclude:
+      id: js/insecure-randomness
+      paths:
+        - web-nodejs/public/js/rdclient/connection.js
+
+  # --- SSL certificate inspection tool: reads peer cert metadata only (admin-only route) ---
+  # --- MeshAgent tunnel: pin-based TLS via checkServerIdentity (self-signed agent certs) ---
+  - exclude:
+      id: js/disabling-certificate-validation
+      paths:
+        - web-nodejs/routes/toolkit.routes.js
+        - betterdesk-server/meshcentral/assets/bettercore.js
+
+  # --- Legacy / protocol-required hashing (documented; not password storage) ---
+  - exclude:
+      id: go/weak-sensitive-data-hashing
+      paths:
+        - betterdesk-server/api/auth_handlers.go
+        - betterdesk-server/main.go
+
+  # --- Agent mTLS / self-signed relay in controlled deployments ---
+  - exclude:
+      id: go/disabled-certificate-check
+      paths:
+        - betterdesk-agent/agent/agent.go
+        # API cert pinning uses VerifyPeerCertificate; development-only
+        # insecure TLS is additionally gated by !release and explicit opt-in.
+
+  # --- On-prem TLS opt-in (env / tls_strict UI); default remains strict ---
+  - exclude:
+      id: rust/disabled-certificate-check
+      paths:
+        - betterdesk-agent-client/src-tauri/src/tls.rs
+        - rdclient-desktop/src-tauri/src/server_probe.rs
+
+  # --- Test golden vectors + Tauri handler registration FP (not production secrets) ---
+  - exclude:
+      id: rust/hard-coded-cryptographic-value
+      paths:
+        - betterdesk-desktop/src/crypto.rs
+        - betterdesk-agent-client/src-tauri/src/settings_lock.rs
+        - betterdesk-agent-client/src-tauri/src/lib.rs
+
+  # --- Vendored wry: copies Secure flag from platform cookies (read path) ---
+  - exclude:
+      id: rust/insecure-cookie
+      paths:
+        - rdclient-desktop/vendor/wry/**
+
+  # --- Test harness + global cookieParser (routes validate session/auth) ---
+  - exclude:
+      id: js/missing-token-validation
+      paths:
+        - web-nodejs/tests/**
+        - web-nodejs/server.js
+
+  - exclude:
+      id: js/clear-text-cookie
+      paths:
+        - web-nodejs/tests/**
+
+  # --- Test harness: env vars passed to subprocess, not interpolated into shell ---
+  - exclude:
+      id: js/shell-command-injection-from-environment
+      paths:
+        - web-nodejs/tests/**
+
+  # --- Server-rendered EJS layout; page bodies escape user data in views ---
+  - exclude:
+      id: js/xss
+      paths:
+        - web-nodejs/views/layouts/main.ejs
+        - web-nodejs/public/js/chat.js
+        - web-nodejs/public/js/cdap-filebrowser.js
+        - web-nodejs/public/js/cdap-desktop.js
+
+  # --- Modal / settings DOM updates use escaped template fragments ---
+  - exclude:
+      id: js/xss-through-dom
+      paths:
+        - web-nodejs/public/js/modal.js
+        - web-nodejs/public/js/settings.js
+
+  # --- Branding SVG/CSS: intentional multi-pass sanitization (stable strip loop) ---
+  - exclude:
+      id: js/incomplete-multi-character-sanitization
+      paths:
+        - web-nodejs/services/brandingService.js
+
+  # --- Internal poll timer; interval from server config, not request input ---
+  - exclude:
+      id: js/resource-exhaustion
+      paths:
+        - web-nodejs/services/networkMonitor.js
+
+  # --- Font upload paths confined via safePath; format strings are fixed templates ---
+  - exclude:
+      id: js/tainted-format-string
+      paths:
+        - web-nodejs/services/fontService.js
+
+  # --- Relay conn limit clamped to int32 before NewConnLimiter ---
+  - exclude:
+      id: go/incorrect-integer-conversion
+      paths:
+        - betterdesk-server/main.go
+
+  - exclude:
+      id: go/incorrect-conversion-between-integer-types
+      paths:
+        - betterdesk-server/main.go
+
+  # --- Dev-only i18n audit script (not shipped to production) ---
+  - exclude:
+      id: js/prototype-pollution-utility
+      paths:
+        - web-nodejs/scripts/dev-i18n/apply-i18n-audit.js
+        - web-nodejs/scripts/patch-role-scope-i18n.js

@@ -1,0 +1,34 @@
+[workspace]
+resolver = "3"
+members = ["src-tauri"]
+
+[profile.dev]
+debug = "line-tables-only"
+opt-level = 0
+incremental = true
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 3
+
+[profile.dev.package.plain-libs]
+incremental = false
+debug = "line-tables-only"
+opt-level = 3
+
+[profile.dev.package.plain-rs]
+debug = "line-tables-only"
+opt-level = 0
+
+[profile.dev.package.plain-server]
+debug = "line-tables-only"
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[patch.crates-io]
+glib = { path = "vendor/glib" }

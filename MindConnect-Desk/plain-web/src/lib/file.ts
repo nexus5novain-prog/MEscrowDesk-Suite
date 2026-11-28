@@ -1,0 +1,269 @@
+import { getFileId, getFileName, getFileExtension, getFileUrl } from './api/file'
+import type { IData, IBreadcrumbItem } from './interfaces'
+import { directoryWithinRoot, normalizeDirectoryPath } from './directory-picker-path'
+
+export function fileNameError(name: string): string {
+  return name === '.' || name === '..' || /[/\\]/.test(name) ? 'invalid_file_path' : ''
+}
+
+const photoExtensions = ['.jpg', '.png', '.jpeg', '.bmp', '.webp', '.heic', '.heif', '.apng', '.avif', '.gif', '.tiff', '.tif', '.svg', '.ico']
+const videoExtensions = ['.mp4', '.mkv', '.webm', '.avi', '.3gp', '.mov', '.m4v', '.3gpp']
+const audioExtensions = ['.mp3', '.wav', '.wma', '.ogg', '.m4a', '.opus', '.flac', '.aac']
+const rawExtensions = ['.dng', '.orf', '.nef', '.arw', '.rw2', '.cr2', '.cr3']
+
+export interface IFile extends IData {
+  fileId: string
+  path: string
+  name: string
+  isDir: boolean
+  isSystem: boolean
+  updatedAt: string
+  createdAt: string
+  extension: string
+  size: number
+}
+
+// Keep in sync with String.isTextFile() in plain-app shared-lib (same whitelist).
+export function isTextFile(name: string) {
+  const v = name.toLowerCase()
+  return [
+    '.txt', '.md', '.markdown', '.xml', '.html', '.json', '.csv', '.log', '.yaml', '.yml',
+    '.ovpn', '.opml', '.cfg', '.conf', '.ini', '.rtf', '.tex', '.sh', '.bat', '.properties', '.plist',
+    '.asp', '.aspx', '.php', '.js', '.css', '.java', '.py', '.rb', '.rs', '.swift', '.kt', '.go', '.sql', '.ts',
+  ].some((it) => v.endsWith(it))
+}
+
+export function isAppFile(path: string) {
+  return path.startsWith('fid:')
+}
+
+export function isImage(name: string) {
+  const v = name.toLowerCase()
+  return photoExtensions.some((it) => v.endsWith(it))
+}
+
+export function isSvg(name: string) {
+  const v = name.toLowerCase()
+  return v.endsWith('.svg')
+}
+
+export function isHeic(name: string) {
+  const v = name.toLowerCase()
+  return v.endsWith('.heic') || v.endsWith('.heif')
+}
+
+export function isVideo(name: string) {
+  const v = name.toLowerCase()
+  return videoExtensions.some((it) => v.endsWith(it))
+}
+
+export function isAudio(name: string) {
+  const v = name.toLowerCase()
+  return audioExtensions.some((it) => v.endsWith(it))
+}
+
+const officeExtensions = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']
+
+export function isOfficeFile(name: string) {
+  const value = name.toLowerCase()
+  return officeExtensions.some((extension) => value.endsWith(extension))
+}
+
+export function canOpenInTextViewer(name: string) {
+  return isTextFile(name) || isOfficeFile(name)
+}
+
+const docExtensions = [...officeExtensions, '.pdf', '.txt', '.md', '.csv', '.json', '.xml', '.js', '.ts', '.py', '.java', '.kt', '.swift', '.c', '.cpp', '.h', '.cs', '.go', '.rs', '.rb', '.sh', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.log']
+
+export function isDoc(name: string) {
+  const v = name.toLowerCase()
+  return docExtensions.some((it) => v.endsWith(it))
+}
+
+export function isRaw(name: string) {
+  const v = name.toLowerCase()
+  return rawExtensions.some((it) => v.endsWith(it))
+}
+
+export function canView(name: string) {
+  return isImage(name) || isVideo(name) || isAudio(name)
+}
+
+export function canOpenInBrowser(name: string) {
+  return ['.txt', '.pdf', '.md'].some((it) => name.endsWith(it))
+}
+
+export function getSortItems(name: 'name' | 'title' = 'name') {
+  return [
+    { label: 'sort_by.date_asc', value: 'UPDATED_AT_ASC' },
+    { label: 'sort_by.date_desc', value: 'UPDATED_AT_DESC' },
+    { label: 'sort_by.size_asc', value: 'SIZE_ASC' },
+    { label: 'sort_by.size_desc', value: 'SIZE_DESC' },
+    { label: `sort_by.${name}_asc`, value: `${name.toUpperCase()}_ASC` },
+    { label: `sort_by.${name}_desc`, value: `${name.toUpperCase()}_DESC` },
+  ]
+}
+
+export function getImageSortItems() {
+  return getSortItems()
+}
+
+export function getImageGroupByItems() {
+  return [
+    { label: 'group_by.none', value: '' },
+    { label: 'group_by.taken_time', value: 'TAKEN_AT' },
+  ]
+}
+
+export function getVideoGroupByItems() {
+  return [
+    { label: 'group_by.none', value: '' },
+    { label: 'group_by.taken_time', value: 'TAKEN_AT' },
+  ]
+}
+
+export function getGroupDateKey(takenAt: string | undefined | null, createdAt: string): string {
+  const d = takenAt ? new Date(takenAt) : new Date(createdAt)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function formatGroupDateLabel(dateKey: string): string {
+  // Parse as local noon to avoid DST/timezone boundary issues
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(dateKey + 'T12:00:00'))
+}
+
+export async function getVideoData(videoFile: File): Promise<{ src: string; durationMs: number; thumbnail: string; width: number; height: number }> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video')
+    const canvas = document.createElement('canvas')
+
+    const src = URL.createObjectURL(videoFile)
+    video.src = src
+    video.play()
+
+    video.onloadeddata = async () => {
+      const squareSize = Math.min(video.videoWidth, video.videoHeight)
+      const cropX = (video.videoWidth - squareSize) / 2
+      const cropY = (video.videoHeight - squareSize) / 2
+
+      canvas.width = 200 // Set the desired width
+      canvas.height = 200 // Set the desired height
+      const canvasContext = canvas.getContext('2d')
+      if (canvasContext) {
+        canvasContext.drawImage(video, cropX, cropY, squareSize, squareSize, 0, 0, canvas.width, canvas.height)
+      }
+
+      const thumbnail = canvas.toDataURL()
+
+      // Pause the video and clean up
+      video.pause()
+      video.currentTime = 0
+
+      URL.revokeObjectURL(src)
+      video.remove()
+      canvas.remove()
+
+      resolve({
+        src,
+        durationMs: Math.round(video.duration * 1000),
+        thumbnail,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      })
+    }
+    video.onerror = () => {
+      resolve({ src, durationMs: 0, thumbnail: '', width: 0, height: 0 })
+    }
+  })
+}
+
+export async function getImageData(file: File): Promise<{ src: string; width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const src = URL.createObjectURL(file)
+    img.onload = function () {
+      URL.revokeObjectURL(src)
+      resolve({
+        src,
+        width: img.width,
+        height: img.height,
+      })
+    }
+    img.src = src
+    img.onerror = () => {
+      resolve({ src, width: 0, height: 0 })
+    }
+  })
+}
+
+export function getDirFromPath(path: string) {
+  const index = path.lastIndexOf('/')
+  return index === -1 ? '' : path.substring(0, index)
+}
+
+export function getDirectoryBreadcrumbs(path: string, rootPath: string, rootName: string): IBreadcrumbItem[] {
+  const root = normalizeDirectoryPath(rootPath)
+  const items = [{ path: root, name: rootName }]
+  if (!directoryWithinRoot(path, root)) return items
+
+  const segments = normalizeDirectoryPath(path).slice(root.length).split('/').filter(Boolean)
+  let current = root
+  for (const name of segments) {
+    current += (current.endsWith('/') ? '' : '/') + name
+    items.push({ path: current, name })
+  }
+  return items
+}
+
+export function enrichFile<T extends Pick<IFile, 'path' | 'isDir' | 'updatedAt' | 'size'> & Partial<Pick<IFile, 'name' | 'createdAt' | 'isSystem'>>>(item: T) {
+  const name = item.name ?? getFileName(item.path.replace(/\/+$/, ''))
+  const extension = item.isDir ? '' : getFileExtension(name)
+  return {
+    ...item,
+    id: item.path,
+    isSystem: item.isSystem ?? false,
+    name,
+    fileId: '',
+    createdAt: item.createdAt ?? '',
+    extension,
+  }
+}
+
+/**
+ * Compute a file's thumbnail URL on demand. enrichFile deliberately leaves
+ * fileId empty so listing a large directory does not run thousands of ChaCha
+ * encryptions up front — only the rows actually rendered pay the cost
+ * (getFileId caches per path in window.fileIdMap).
+ */
+export function fileThumbUrl(urlTokenKey: Uint8Array | null, item: Pick<IFile, 'path' | 'name' | 'isDir' | 'updatedAt'>): string {
+  if (item.isDir || !(isImage(item.name) || isVideo(item.name))) return ''
+  return getFileUrl(getFileId(urlTokenKey, item.path), '&size=SM&v=' + encodeURIComponent(item.updatedAt))
+}
+
+export const ZIP_SEPARATOR = '!zip!/'
+
+export function isZipFile(name: string) {
+  return name.toLowerCase().endsWith('.zip')
+}
+
+export function isZipPath(path: string) {
+  return path.includes(ZIP_SEPARATOR)
+}
+
+export function getZipFilePath(path: string) {
+  return path.split(ZIP_SEPARATOR)[0]
+}
+
+export function getZipInternalPath(path: string) {
+  return path.split(ZIP_SEPARATOR)[1] ?? ''
+}
+
+export function joinZipPath(zipFilePath: string, internalPath: string) {
+  return `${zipFilePath}${ZIP_SEPARATOR}${internalPath}`
+}
+

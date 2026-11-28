@@ -1,0 +1,21 @@
+import type { TimeagoMessages } from '@/lib/timeago'
+
+export default {
+  now: '剛剛',
+  short: {
+    minutes: '{n}分鐘前',
+    hours: '{n}小時前',
+    days: '{n}天前',
+    weeks: '{n}週前',
+    months: '{n}個月前',
+    years: '{n}年前',
+  },
+  long: {
+    minutes: '{n}分鐘前',
+    hours: '{n}小時前',
+    days: '{n}天前',
+    weeks: '{n}週前',
+    months: '{n}個月前',
+    years: '{n}年前',
+  },
+} as const satisfies TimeagoMessages

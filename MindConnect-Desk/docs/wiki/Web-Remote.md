@@ -1,0 +1,191 @@
+# Web Remote Desktop
+
+Browser remote from the web console — no separate desktop app required. Prefer **HTTPS** so WebCodecs (VP9/AV1) work; plain HTTP falls back to H.264 with lower performance.
+
+**For operators:** open a device → Connect (or Support Agent Web Remote) → enter password → use quality presets / recording as needed. If the target is in WebSocket mode, use a current 3.5.x relay (TCP↔WS bridge).
+
+**For developers:** codec / input notes further down.
+
+---
+
+## Features
+
+| Feature | HTTPS | HTTP |
+|---------|-------|------|
+| Video codec | VP9, H.264, AV1, VP8 (WebCodecs) | H.264 only (JMuxer fallback) |
+| Max FPS | 60 | 30 |
+| Audio / keyboard / mouse / clipboard | Yes | Yes |
+| Session recording | WebM VP9+Opus | WebM VP9+Opus |
+| Monitor switching / quality presets | Yes | Yes |
+
+---
+
+## Connecting
+
+### From the Devices Page
+
+1. Click the kebab menu (⋮) on a device row
+2. Select **Connect**
+3. Enter the device password
+4. The remote desktop opens in a new tab
+
+### Direct URL
+
+```
+http://your-server:5000/remote?id=DEVICE_ID
+```
+
+---
+
+## Controls
+
+### Toolbar
+
+The remote desktop toolbar appears at the top:
+
+| Button | Function |
+|--------|----------|
+| **Quality** | Switch between Speed / Balanced / Quality / Best presets |
+| **Monitor** | Select which monitor to view (shows resolution) |
+| **Record** | Start/stop session recording (downloads WebM on stop) |
+| **Fullscreen** | Toggle fullscreen mode |
+| **Disconnect** | End the remote session |
+
+### Keyboard Shortcuts
+
+All standard keyboard shortcuts pass through to the remote machine, including:
+- Modifier keys (Ctrl, Alt, Shift, Win/Meta)
+- Function keys (F1-F12)
+- Special keys (PrintScreen, Scroll Lock, Pause)
+- Ctrl+Alt+Delete (when supported by the remote OS)
+
+### Mouse Input
+
+| Action | Encoding |
+|--------|----------|
+| Left click | `TYPE_DOWN \| (BUTTON_LEFT << 3)` |
+| Right click | `TYPE_DOWN \| (BUTTON_RIGHT << 3)` |
+| Middle click | `TYPE_DOWN \| (BUTTON_MIDDLE << 3)` |
+| Scroll | `TYPE_WHEEL \| (direction << 3)` |
+| Move | Position sent as coordinates relative to canvas |
+
+---
+
+## Quality Presets
+
+| Preset | Image Quality | FPS | Use Case |
+|--------|--------------|-----|----------|
+| **Speed** | Low | 30 | Slow connections, basic tasks |
+| **Balanced** | Balanced | 30 | General use |
+| **Quality** | Best | 30 | Detail work, design, reading |
+| **Best** | Best | 60 | High-bandwidth, professional use |
+
+Quality changes take effect immediately via `Misc` message to the peer.
+
+---
+
+## Session Recording
+
+Record sessions as WebM video (VP9 + Opus audio):
+
+1. Click **Record** in the toolbar (circle icon turns red)
+2. Perform your remote desktop tasks
+3. Click **Record** again to stop
+4. The recording downloads automatically as a `.webm` file
+
+Recordings capture the canvas at 15 fps. Audio is included if active during the session.
+
+---
+
+## Monitor Switching
+
+For multi-monitor setups:
+
+1. Click the **Monitor** dropdown in the toolbar
+2. Select the desired display
+3. The view switches to the selected monitor
+4. **Primary** indicator shows which monitor is the default
+
+Each monitor shows its resolution (e.g., `Monitor 1 (1920×1080) ★`).
+
+---
+
+## Video Pipeline
+
+### HTTPS (WebCodecs)
+
+```
+Peer → H.264/VP9/AV1 frames → WebSocket → WebCodecs VideoDecoder → Canvas
+```
+
+- Negotiates codec via `VideoDecoder.isConfigSupported()`
+- Supports VP9 (preferred), H.264, AV1, VP8
+- Hardware acceleration when available
+- `video_received` ACK sent before decode for optimal pipeline
+
+### HTTP (JMuxer Fallback)
+
+```
+Peer → H.264 frames → WebSocket → JMuxer → MSE → Video element → Canvas
+```
+
+- JMuxer converts raw H.264 NALUs to MP4 fragments
+- MSE SourceBuffer trimmed at 2 seconds to prevent overflow
+- Auto-seek when buffer latency exceeds 500ms
+- Health check every 1000ms with stall recovery
+
+### Stall Recovery
+
+If no frames arrive for 5 seconds, the client automatically requests a `refreshVideo` keyframe from the peer to resume the stream.
+
+---
+
+## Technical Details
+
+### Connection Flow
+
+1. Client opens WebSocket to Node.js console (`/ws/remote/{id}`)
+2. Console proxies through Go server relay
+3. NaCl key exchange establishes encrypted channel
+4. Login message sent with password, codec preferences, FPS
+5. Peer responds with video/audio streams
+
+### Browser Requirements
+
+| Browser | WebCodecs | JMuxer | Status |
+|---------|-----------|--------|--------|
+| Chrome 94+ | ✅ | ✅ | Full support |
+| Edge 94+ | ✅ | ✅ | Full support |
+| Firefox 130+ | ✅ | ✅ | Full support |
+| Safari 16.4+ | Partial | ✅ | H.264 only |
+
+### Known Limitations
+
+- JMuxer (HTTP) is limited to H.264 at ~30 fps
+- FileTransfer is not supported in web remote (use RustDesk desktop client)
+- Audio quality depends on network bandwidth
+- Some keyboard shortcuts may be intercepted by the browser (e.g., Ctrl+W)
+
+### Mobile and tablet performance
+
+- HTTPS remains the preferred path on tablets. After the browser accepts a
+  custom certificate, `window.isSecureContext` can enable WebCodecs and the
+  browser's hardware decoder when supported.
+- HTTP remains supported through the H.264/JMuxer fallback. The client starts
+  that path at 30 FPS and does not enable server-side adaptive FPS above that
+  limit, preventing MSE queue growth on mobile browsers.
+- Touch tablets start remote control at 30 FPS for a stable handshake. On
+  HTTPS, adaptive quality can promote a capable device to 45/60 FPS; the
+  toolbar can also change quality, FPS, and codec manually.
+- These choices are automatic; no browser variables or manual device profile
+  are required. The disconnect status includes the WebSocket close code/reason
+  when the relay is the source, while peer-initiated closes retain the remote
+  reason.
+
+---
+
+## See also
+
+- [[Web Console|Web-Console]] — launching remote from Devices page
+- [[MeshAgent]] — MeshCentral-compatible web remote transport
+- [[Client Setup|Client-Setup]] — desktop client alternative

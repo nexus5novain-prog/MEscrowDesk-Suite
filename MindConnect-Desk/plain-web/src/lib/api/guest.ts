@@ -1,0 +1,164 @@
+import { AccessErrorCode } from '@/lib/api/access-error-code'
+import { PeerConnectionErrorCode } from '@/lib/api/peer-connection-error-code'
+import { FileAction, fileQuery } from './file-action'
+import { resourceId } from './resource-link'
+import { getApiBaseUrl, getProxyUrl } from './api'
+import { httpRequest } from './http'
+import {
+  chachaEncrypt,
+  httpRequestAad,
+  decryptGraphqlResponse,
+} from './crypto'
+import { graphqlRequestPayload } from './graphql-request'
+
+/**
+ * Client for the shared-file-link (`/s`) page.
+ *
+ * Talks to the plain-app **guest** endpoints:
+ * - `POST /guest_graphql` — request body is ChaCha20-encrypted with the
+ *   link's `shared_token` (from the URL fragment), `c-id` carries the public
+ *   `shared_id`. Exposes only the `sharedInfo` query.
+ * - `GET /fs` — file bytes; the `id` query param is `{sharedId, relativePath}`
+ *   authenticated with the share's dedicated `url_token`; the ID includes the share identity.
+ * - `GET /zip/dir` — download a shared directory as a zip (same auth).
+ *
+ * Everything is isolated from the main desktop session (different key + id).
+ */
+
+const TIMEOUT = 30000
+
+export interface SharedFile {
+  name: string
+  relativePath: string
+  isDir: boolean
+  size: number
+  mimeType: string
+  hasThumb: boolean
+}
+
+export interface SharedInfo {
+  name: string
+  readOnly: boolean
+  requiresPassword: boolean
+  expiresAt: string | null
+  urlToken: string
+  entries: SharedFile[]
+}
+
+export interface GuestResult<T = any> {
+  data: T
+  errors?: Array<{ message: string }>
+}
+
+/**
+ * Decode a base64url-encoded `shared_token` (unpadded, `-`/`_`) into the raw
+ * 32-byte ChaCha20 key used for `/guest_graphql`.
+ */
+export function sharedTokenToKey(token: string): Uint8Array {
+  const b64 = token.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4)
+  const bin = atob(b64 + pad)
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0))
+}
+
+export const sharedInfoGQL = `
+  query sharedInfo($relativePath: String) {
+    sharedInfo(relativePath: $relativePath) {
+      name
+      readOnly
+      requiresPassword
+      expiresAt
+      urlToken
+      entries {
+        name
+        relativePath
+        isDir
+        size
+        mimeType
+        hasThumb
+      }
+    }
+  }
+`
+
+export async function guestFetch<T = any>(
+  sharedId: string,
+  key: Uint8Array,
+  query: string,
+  variables?: Record<string, any>,
+): Promise<GuestResult<T>> {
+  const url = `${getApiBaseUrl()}/guest_graphql`
+  const payload = graphqlRequestPayload(query, variables)
+  const body = chachaEncrypt(key, payload, httpRequestAad('/guest_graphql'))
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT)
+  try {
+    if (window.__PLAIN_LOG__) {
+      console.info(`[gql] → sharedInfo @${new URL(url).host}${variables ? ` ${JSON.stringify(variables)}` : ''}`)
+    }
+    const startTime = performance.now()
+    const response = await httpRequest(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data', 'c-id': sharedId },
+      body,
+      signal: controller.signal,
+    })
+    if (response.status === 401) {
+      throw new Error(AccessErrorCode.Unauthorized)
+    } else if (response.status === 403) {
+      throw new Error(AccessErrorCode.Forbidden)
+    } else if (!response.ok) {
+      throw new Error('bad_request')
+    }
+    const arrayBuffer = await response.arrayBuffer()
+    const apiEndTime = performance.now()
+    const text = decryptGraphqlResponse(key, body, new Uint8Array(arrayBuffer))
+    if (window.__PLAIN_LOG__) {
+      console.info(`[gql] ← sharedInfo (${Math.round(apiEndTime - startTime)}ms) ${text}`)
+    }
+    return JSON.parse(text)
+  } catch (e: any) {
+    if (window.__PLAIN_LOG__) {
+      console.warn(`[gql] ✗ sharedInfo ${e.message || e.name}`)
+    }
+    if (e.name === 'AbortError') throw new Error(PeerConnectionErrorCode.ConnectionTimeout, { cause: e })
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Encrypt the `{sharedId, relativePath}` payload into the guest file id.
+ */
+export function getSharedFileId(urlToken: string, sharedId: string, relativePath: string): string {
+  const key = Uint8Array.from(atob(urlToken), (c) => c.charCodeAt(0))
+  return resourceId(key, { mode: 's', id: sharedId }, { type: 'SHARED_FILE', id: relativePath })
+}
+
+/** The resource ID carries the share identity for `/fs` and `/zip/dir`. */
+function sharedFileQuery(urlToken: string, sharedId: string, relativePath: string): string {
+  return `id=${encodeURIComponent(getSharedFileId(urlToken, sharedId, relativePath))}`
+}
+
+/**
+ * Build a `/fs` URL for a shared file. `query` may add thumbnail params
+ * (`&size=SM`) or force download (`&action=DOWNLOAD`).
+ */
+export function getSharedFileUrl(
+  urlToken: string,
+  sharedId: string,
+  relativePath: string,
+  query: string = '',
+  action: FileAction = FileAction.Preview,
+): string {
+  return getProxyUrl(`/fs?${sharedFileQuery(urlToken, sharedId, relativePath)}${fileQuery(action, query)}`, '')
+}
+
+/**
+ * Build a `/zip/dir` URL that downloads a shared directory as a zip.
+ */
+export function getSharedDirUrl(urlToken: string, sharedId: string, relativePath: string): string {
+  return getProxyUrl(`/zip/dir?${sharedFileQuery(urlToken, sharedId, relativePath)}`, '')
+}

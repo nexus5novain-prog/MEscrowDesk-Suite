@@ -1,0 +1,158 @@
+import { AuthErrorCode } from '@/lib/api/auth-error-code'
+import { loginErrorReason } from './login-error'
+import { openSocket } from './http'
+import { getWebSocketBaseUrl } from './api'
+import { WebSocketCrypto } from './websocket-crypto'
+import { getCurrentAuthToken } from '@/lib/device/current'
+
+type LoginFrame = string | ArrayBuffer | Blob
+
+export async function openLoginSocket(url: string, signal?: AbortSignal) {
+  const target = new URL(url)
+  const proxied = /^\/proxy\/[^/]+\/auth$/.test(target.pathname)
+  if (proxied && target.origin !== new URL(getWebSocketBaseUrl()).origin) throw AuthErrorCode.InternalError
+  const socket = openSocket(url)
+  const frames: LoginFrame[] = []
+  const pendingWork = new Set<(reason: AuthErrorCode) => void>()
+  let failure: AuthErrorCode | undefined
+  let waiting:
+    | {
+        resolve(frame: LoginFrame): void
+        reject(reason: AuthErrorCode): void
+      }
+    | undefined
+  let resolveOpen: () => void
+  let rejectOpen: (reason: AuthErrorCode) => void
+  const connected = new Promise<void>((resolve, reject) => {
+    resolveOpen = resolve
+    rejectOpen = reject
+  })
+
+  const cleanup = () => {
+    signal?.removeEventListener('abort', abort)
+    window.clearTimeout(connectionTimeout)
+    window.clearTimeout(deadline)
+  }
+  const fail = (reason: AuthErrorCode) => {
+    if (failure) return
+    failure = reason
+    cleanup()
+    rejectOpen(reason)
+    waiting?.reject(reason)
+    waiting = undefined
+    for (const reject of pendingWork) reject(reason)
+    pendingWork.clear()
+    socket.close(3001, reason)
+  }
+  const abort = () => fail(AuthErrorCode.Canceled)
+  const connectionTimeout = window.setTimeout(() => fail(AuthErrorCode.Timeout), 10000)
+  const deadline = window.setTimeout(() => fail(AuthErrorCode.Timeout), 300000)
+
+  socket.onopen = () => {
+    if (!proxied) window.clearTimeout(connectionTimeout)
+    resolveOpen()
+  }
+  socket.onmessage = (event: MessageEvent<LoginFrame>) => {
+    if (failure) return
+    const size =
+      typeof event.data === 'string'
+        ? event.data.length
+        : event.data instanceof ArrayBuffer
+          ? event.data.byteLength
+          : event.data.size
+    if (size > 65536 || frames.length >= 16) {
+      fail(AuthErrorCode.InternalError)
+      return
+    }
+    if (waiting) {
+      waiting.resolve(event.data)
+      waiting = undefined
+    } else {
+      frames.push(event.data)
+    }
+  }
+  socket.onerror = () => fail(AuthErrorCode.InternalError)
+  socket.onclose = (event: CloseEvent) => fail(loginErrorReason(event.reason))
+  signal?.addEventListener('abort', abort, { once: true })
+  if (signal?.aborted) abort()
+  await connected
+
+  const receive = async (): Promise<LoginFrame> => {
+    if (failure) throw failure
+    const frame = frames.shift()
+    if (frame !== undefined) return frame
+    return new Promise((resolve, reject) => {
+      waiting = { resolve, reject }
+    })
+  }
+
+  if (proxied) {
+    try {
+      const cid = target.searchParams.get('cid') || ''
+      const key = Uint8Array.from(atob(getCurrentAuthToken()), char => char.charCodeAt(0))
+      const crypto = new WebSocketCrypto(cid, key, target.pathname + target.search)
+      socket.send(crypto.registration as ArrayBufferView<ArrayBuffer>)
+      const frame = await receive()
+      if (typeof frame === 'string') throw new Error('Invalid proxy acknowledgement')
+      const bytes = frame instanceof ArrayBuffer ? frame : await frame.arrayBuffer()
+      crypto.acknowledge(new Uint8Array(bytes))
+      socket.send(crypto.encode(new Uint8Array()) as ArrayBufferView<ArrayBuffer>)
+      window.clearTimeout(connectionTimeout)
+    } catch {
+      const reason = failure ?? AuthErrorCode.InternalError
+      fail(reason)
+      throw reason
+    }
+  }
+
+  return {
+    async waitFor<T>(work: Promise<T>): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        if (failure) {
+          reject(failure)
+        } else {
+          pendingWork.add(reject)
+        }
+        work.then(
+          (value) => {
+            pendingWork.delete(reject)
+            resolve(value)
+          },
+          (error) => {
+            pendingWork.delete(reject)
+            reject(error)
+          }
+        )
+      })
+    },
+    send(data: string | Uint8Array) {
+      if (failure) throw failure
+      socket.send(data as string | ArrayBufferView<ArrayBuffer>)
+    },
+    async receiveText() {
+      const frame = await receive()
+      if (typeof frame !== 'string' || frame.length > 4096) throw AuthErrorCode.InternalError
+      return frame
+    },
+    async receiveBytes() {
+      const frame = await receive()
+      if (typeof frame === 'string') throw AuthErrorCode.InternalError
+      const bytes = frame instanceof ArrayBuffer ? frame : await frame.arrayBuffer()
+      if (failure) throw failure
+      return new Uint8Array(bytes)
+    },
+    close(reason?: AuthErrorCode) {
+      if (reason) {
+        fail(reason)
+        return
+      }
+      if (failure) return
+      failure = AuthErrorCode.Canceled
+      cleanup()
+      frames.length = 0
+      socket.close()
+    },
+  }
+}
+
+export type LoginSocket = Awaited<ReturnType<typeof openLoginSocket>>

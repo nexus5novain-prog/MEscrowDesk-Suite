@@ -1,0 +1,104 @@
+# check=skip=SecretsUsedInArgOrEnv
+# Dockerfile for BetterDesk Console (Node.js)
+# Multi-stage build for smaller production image
+#
+# Stage 1: Install dependencies (cached layer)
+# Stage 2: Production image with only runtime deps
+
+# ---- Build stage ----
+# TEMPORARY: Node 24.19.0 triggers a native better-sqlite3 cleanup-hook
+# assertion during Statement GC. Keep the production console on the latest
+# Node 22 LTS patch until the Node 24 backport is released and validated.
+FROM node:22.23.2-alpine3.24 AS build
+
+WORKDIR /app
+
+# Build dependencies for native modules (better-sqlite3, bcrypt)
+# Note: sqlite-dev is NOT needed — better-sqlite3 bundles its own SQLite
+RUN apk add --no-cache python3 make g++ || { sleep 2 && apk add --no-cache python3 make g++; }
+
+# Copy package files first (better Docker cache)
+COPY web-nodejs/package.json web-nodejs/package-lock.json* ./
+
+# Install production dependencies (native modules build automatically)
+RUN npm ci --omit=dev
+
+# ---- Production stage ----
+FROM node:22.23.2-alpine3.24
+
+LABEL maintainer="UNITRONIX"
+LABEL description="BetterDesk Console - Web Management Panel"
+LABEL version="3.5.272"
+
+WORKDIR /app
+
+# Install runtime dependencies (retry for transient DNS failures)
+RUN apk add --no-cache \
+    sqlite \
+    curl \
+    tini \
+    su-exec \
+    shadow \
+    || { sleep 2 && apk add --no-cache sqlite curl tini su-exec shadow; } \
+    && addgroup -g 10001 -S betterdesk \
+    && adduser -u 10001 -S -G betterdesk betterdesk
+
+# The production image never runs npm; remove its bundled CLI and transitive
+# package tree (including tar) from the runtime attack surface.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
+# Copy application files FIRST, then overlay compiled node_modules.
+# This prevents local node_modules from overwriting Alpine/musl native modules.
+COPY web-nodejs/ .
+COPY --from=build /app/node_modules ./node_modules/
+
+ARG BETTERDESK_COMMIT_SHA=unknown
+ARG BETTERDESK_IMAGE_VERSION=unknown
+ENV BETTERDESK_IMAGE_SHA=${BETTERDESK_COMMIT_SHA}
+ENV BETTERDESK_IMAGE_VERSION=${BETTERDESK_IMAGE_VERSION}
+ENV BETTERDESK_UPDATE_MODE=image
+RUN printf '%s\n' "${BETTERDESK_COMMIT_SHA}" > /app/.image-commit
+
+# Copy entrypoint scripts
+COPY docker/ensure-app-user.sh /ensure-app-user.sh
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY docker/console-entrypoint.sh /console-entrypoint.sh
+COPY docker/bootstrap-admin-credentials.sh /docker/bootstrap-admin-credentials.sh
+COPY docker/guard-sqlite-auth-split.sh /docker/guard-sqlite-auth-split.sh
+COPY docker/show-admin-credentials.sh /usr/local/bin/betterdesk-show-admin-credentials
+RUN chmod +x /ensure-app-user.sh /app/docker-entrypoint.sh /console-entrypoint.sh /docker/bootstrap-admin-credentials.sh /docker/guard-sqlite-auth-split.sh /usr/local/bin/betterdesk-show-admin-credentials
+
+# Create data directories
+RUN mkdir -p /app/data /opt/rustdesk && \
+    chown -R betterdesk:betterdesk /app /opt/rustdesk
+
+# Environment variables (defaults)
+ENV NODE_ENV=production
+ENV PORT=5000
+ENV HOST=0.0.0.0
+ENV API_HOST=0.0.0.0
+ENV DATA_DIR=/app/data
+ENV RUSTDESK_PATH=/opt/rustdesk
+ENV DB_PATH=/app/data/db_v2.sqlite3
+ENV PUB_KEY_PATH=/opt/rustdesk/id_ed25519.pub
+ENV API_KEY_PATH=/opt/rustdesk/.api_key
+ENV SERVER_BACKEND=betterdesk
+# API consolidated onto the Go server (21121); the console proxies to it and
+# does not run its own client API listener.
+ENV API_ENABLED=false
+ENV DOCKER=true
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Expose ports
+# 5000  - Web console (admin panel)
+EXPOSE 5000
+
+# Note: Container starts as root so console-entrypoint.sh can fix volume permissions.
+# It drops to betterdesk user via su-exec before running docker-entrypoint.sh.
+
+# Use tini as init to handle signals properly
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/console-entrypoint.sh"]

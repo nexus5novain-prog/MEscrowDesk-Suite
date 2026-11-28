@@ -1,0 +1,48 @@
+[package]
+name = "plain-rust"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "plain_rust"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+plain-libs = { git = "https://github.com/plainhub/plain-core.git", branch = "main", default-features = false }
+plain-server = { git = "https://github.com/plainhub/plain-core.git", branch = "main", default-features = false, features = ["core", "http_transport"] }
+plain-rs = { git = "https://github.com/plainhub/plain-core.git", branch = "main", default-features = false, features = ["ai-image-search", "ble-native", "prefs"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+plain-server = { git = "https://github.com/plainhub/plain-core.git", branch = "main", default-features = false, features = ["media"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+plain-rs = { git = "https://github.com/plainhub/plain-core.git", branch = "main", default-features = false, features = ["media"] }
+jni = "0.22"
+
+[profile.dev]
+opt-level = 1
+lto = false
+codegen-units = 16
+incremental = true
+debug = 0
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 3
+
+[profile.dev.package.plain-server]
+opt-level = 1
+
+[profile.dev.package.plain-libs]
+incremental = false
+opt-level = 3
+
+[profile.dev.package.plain-rs]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

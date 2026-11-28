@@ -1,0 +1,441 @@
+/**
+ * BetterDesk Console - Auth Middleware
+ * Protects routes that require authentication
+ */
+
+const {
+    getEffectivePermissions,
+    loadEffectivePermissions,
+} = require('../services/rolePermissionService');
+const {
+    ACCESS_LEVEL_RANK,
+    PANEL_ACCESS_CATALOG,
+    normalizeAccessLevel,
+} = require('../lib/panelAccessCatalog');
+
+// Default role-permission map (mirrors Go auth/permissions.go — Phase 52+)
+//
+// Role hierarchy (branched, not strictly linear):
+//   super_admin  — full server + all-org access
+//   ├── server_admin — server config/logs, read-only user visibility
+//   ├── global_admin — all-org user/device management, no server access
+//   └── admin        — legacy alias for super_admin
+//       operator, viewer, pro — unchanged (pro = PRO activation only, no devices)
+const DEFAULT_ROLE_PERMISSIONS = {
+    super_admin: null, // null = ALL permissions
+    admin: null,       // legacy admin = super_admin
+
+    // Server Admin: infrastructure + read-only users
+    server_admin: new Set([
+        'server.config', 'server.keys', 'server.attestation',
+        'blocklist.edit',
+        'user.view',
+        'device.view',
+        'remote_target.view',
+        'audit.view', 'metrics.view',
+        'enrollment.manage',
+    ]),
+
+    // Global Admin: all user/org management, NO server config
+    global_admin: new Set([
+        'user.view', 'user.create', 'user.edit', 'user.delete',
+        'org.create', 'org.edit', 'org.delete', 'org.manage_users', 'org.manage_devices',
+        'device.view', 'device.connect', 'device.edit', 'device.delete',
+        'remote_target.view', 'remote_target.connect', 'remote_target.edit',
+        'remote_target.delete', 'remote_target.test',
+        'guest.create',
+        'device.ban', 'device.change_id', 'device.connection_mode',
+        'audit.view', 'metrics.view',
+        'cdap.view', 'cdap.command',
+        'chat.access',
+        'enrollment.manage', 'enrollment.approve',
+        'branding.edit',
+        'billing.view', 'billing.manage', 'billing.reports', 'billing.export',
+    ]),
+
+    operator: new Set([
+        'device.view', 'device.connect', 'device.edit', 'device.connection_mode',
+        'remote_target.view', 'remote_target.connect', 'remote_target.test',
+        'guest.create',
+        'user.view',
+        'audit.view', 'metrics.view',
+        'cdap.view', 'cdap.command',
+        'enrollment.approve',
+        'chat.access',
+        'org.manage_devices',
+        'billing.view', 'billing.reports',
+    ]),
+    viewer: new Set([
+        'device.view',
+        'remote_target.view',
+        'audit.view', 'metrics.view',
+        'cdap.view',
+        'chat.access',
+    ]),
+    guest_issuer: new Set([
+        'device.view',
+        'guest.create',
+    ]),
+    pro: new Set(),
+};
+
+function isProRole(role) {
+    return role === 'pro';
+}
+
+function proRoleBlocksPermission(role, permission) {
+    if (!isProRole(role)) return false;
+    return permission.startsWith('device.')
+        || permission.startsWith('remote_target.')
+        || permission === 'org.manage_devices';
+}
+
+// Roles that have full admin privileges (bypass all permission checks).
+const SUPER_ADMIN_ROLES = new Set(['super_admin', 'admin']);
+
+/**
+ * Check if a role is a super admin (or legacy admin).
+ */
+function isSuperAdminRole(role) {
+    return SUPER_ADMIN_ROLES.has(role);
+}
+
+/**
+ * Check if a role has a specific permission by default.
+ * @param {string} role
+ * @param {string} permission
+ * @returns {boolean}
+ */
+function roleHasPermission(role, permission) {
+    if (proRoleBlocksPermission(role, permission)) return false;
+    if (isSuperAdminRole(role)) return true;
+    const perms = DEFAULT_ROLE_PERMISSIONS[role];
+    if (!perms) return false;
+    return perms.has(permission);
+}
+
+/**
+ * Check a permission using the request's effective role snapshot when the
+ * panel authorization middleware has loaded one. The static map remains a
+ * compatibility fallback for isolated middleware unit tests and non-panel
+ * callers; production requests are marked as loaded by server.js.
+ */
+function requestHasPermission(req, permission) {
+    const role = req?.session?.user?.role;
+    if (proRoleBlocksPermission(role, permission)) return false;
+    if (isSuperAdminRole(role)) return true;
+
+    // SECURITY (audit H7, 2026-11-13): the panel section policy may only
+    // *narrow* access. The role/permission set loaded from Go is authoritative:
+    // if the role does not hold the permission, a section override must not
+    // manufacture it. Check the authoritative set first, then let the section
+    // policy veto a permission the role does hold.
+    let roleAllows = null;
+    if (req?.effectivePermissions instanceof Set) {
+        roleAllows = req.effectivePermissions.has(permission);
+    } else if (req?.permissionContextLoaded && req.permissionLoadError) {
+        return false;
+    } else {
+        roleAllows = roleHasPermission(role, permission);
+    }
+    if (!roleAllows) return false;
+
+    const policySection = req?.panelAccessPolicy?.sections?.[req.panelAccessSection];
+    const catalogEntry = PANEL_ACCESS_CATALOG.find((entry) => entry.key === req.panelAccessSection);
+    if (policySection && catalogEntry) {
+        const required = catalogEntry.writePermission === permission
+            ? 'write'
+            : catalogEntry.readPermission === permission ? 'read' : null;
+        if (required) {
+            return ACCESS_LEVEL_RANK[normalizeAccessLevel(policySection.access)]
+                >= ACCESS_LEVEL_RANK[required];
+        }
+    }
+    return true;
+}
+
+/**
+ * Resolve a role directly for non-HTTP request paths such as WebSocket
+ * upgrades, where the normal Express permission middleware is not present.
+ */
+async function roleHasEffectivePermission(role, permission) {
+    if (proRoleBlocksPermission(role, permission)) return false;
+    if (isSuperAdminRole(role)) return true;
+    const permissions = await getEffectivePermissions(role);
+    return permissions.has(permission);
+}
+
+/**
+ * Safe relative return URL for RdClient pages only (/remote…).
+ */
+function normalizeRdClientReturnUrl(u) {
+    if (typeof u !== 'string' || u.length === 0) return null;
+    if (/[\r\n\x00\\]/.test(u) || /%(?:00|0a|0d|5c)/i.test(u)) return null;
+    if (!u.startsWith('/') || u.startsWith('//')) return null;
+
+    let parsed;
+    try {
+        parsed = new URL(u, 'https://betterdesk.local');
+    } catch (_) {
+        return null;
+    }
+
+    if (parsed.origin !== 'https://betterdesk.local') return null;
+    if (parsed.pathname !== '/remote' && !parsed.pathname.startsWith('/remote/')) return null;
+    if (parsed.pathname === '/remote/login' || parsed.pathname.startsWith('/remote/login/')) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+function isSafeRdClientReturnUrl(u) {
+    return normalizeRdClientReturnUrl(u) !== null;
+}
+
+function rdClientLoginRedirect(req) {
+    const requested = req.originalUrl || req.url || '/remote';
+    const returnParam = normalizeRdClientReturnUrl(requested)
+        || normalizeRdClientReturnUrl(req.query.return)
+        || '/remote';
+    return `/remote/login?return=${encodeURIComponent(returnParam)}`;
+}
+
+/**
+ * RdClient auth — redirects to /remote/login instead of panel /login.
+ * @param {string} [permission] - optional permission (e.g. device.connect)
+ */
+function requireRdClientAuth(permission) {
+    return function (req, res, next) {
+        if (!req.session || !req.session.userId) {
+            if (req.path.startsWith('/api/')) {
+                return res.status(401).json({ success: false, error: 'Unauthorized. Please log in.' });
+            }
+            return res.redirect(rdClientLoginRedirect(req));
+        }
+
+        if (req.session.user && req.session.user.role === 'pro') {
+            req.session.destroy();
+            if (req.path.startsWith('/api/')) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Pro accounts can only access the RustDesk desktop client API'
+                });
+            }
+            return res.redirect(rdClientLoginRedirect(req));
+        }
+
+        if (permission) {
+            const role = req.session.user && req.session.user.role;
+            if (!requestHasPermission(req, permission)) {
+                if (req.path.startsWith('/api/')) {
+                    return res.status(403).json({ success: false, error: `Permission denied: ${permission}` });
+                }
+                return res.status(403).render('errors/403', {
+                    title: 'Forbidden',
+                    message: 'You do not have permission to access this resource'
+                });
+            }
+        }
+
+        res.locals.user = req.session.user;
+        res.locals.emergencyMode = !!req.session.emergencyMode;
+        next();
+    };
+}
+
+/**
+ * RdClient login page — redirect away if already authenticated with device.connect.
+ */
+function rdClientGuestOnly(req, res, next) {
+    const role = req.session && req.session.user && req.session.user.role;
+    if (req.session && req.session.userId && role !== 'pro' && requestHasPermission(req, 'device.connect')) {
+        const dest = normalizeRdClientReturnUrl(req.query.return) || '/remote';
+        return res.redirect(dest);
+    }
+    next();
+}
+
+/**
+ * Require authentication middleware
+ * Redirects to login page for HTML requests, returns 401 for API requests
+ */
+function requireAuth(req, res, next) {
+    if (!req.session || !req.session.userId) {
+        // API request
+        if (req.path.startsWith('/api/')) {
+            return res.status(401).json({
+                success: false,
+                error: 'Unauthorized. Please log in.',
+                code: 'session_required'
+            });
+        }
+        
+        // HTML request - redirect to login (expired helps UX when cookie was revoked)
+        return res.redirect('/login?expired=1');
+    }
+    
+    // Block pro-only users from web panel (API-only role)
+    if (req.session.user && req.session.user.role === 'pro') {
+        req.session.destroy();
+        if (req.path.startsWith('/api/')) {
+            return res.status(403).json({
+                success: false,
+                error: 'Pro accounts can only access the RustDesk desktop client API'
+            });
+        }
+        return res.redirect('/login');
+    }
+    
+    // Add user info to locals for templates
+    res.locals.user = req.session.user;
+    // Phase A: expose emergency mode flag to EJS templates
+    res.locals.emergencyMode = !!req.session.emergencyMode;
+    
+    next();
+}
+
+/**
+ * Require specific role
+ */
+function requireRole(role) {
+    return function(req, res, next) {
+        if (!req.session || !req.session.userId) {
+            if (req.path.startsWith('/api/')) {
+                return res.status(401).json({ success: false, error: 'Unauthorized' });
+            }
+            return res.redirect('/login');
+        }
+        
+        const userRole = req.session.user && req.session.user.role;
+
+        // Super admin roles bypass all role checks.
+        if (isSuperAdminRole(userRole)) {
+            res.locals.user = req.session.user;
+            return next();
+        }
+
+        if (userRole !== role) {
+            if (req.path.startsWith('/api/')) {
+                return res.status(403).json({ success: false, error: 'Forbidden' });
+            }
+            return res.status(403).render('errors/403', {
+                title: 'Forbidden',
+                message: 'You do not have permission to access this resource'
+            });
+        }
+        
+        res.locals.user = req.session.user;
+        next();
+    };
+}
+
+/**
+ * Optional auth - add user to locals if logged in, but don't require it
+ */
+function optionalAuth(req, res, next) {
+    if (req.session && req.session.userId) {
+        res.locals.user = req.session.user;
+    } else {
+        res.locals.user = null;
+    }
+    next();
+}
+
+/**
+ * Guest only - redirect to dashboard if already logged in
+ */
+function guestOnly(req, res, next) {
+    if (req.session && req.session.userId) {
+        return res.redirect('/');
+    }
+    next();
+}
+
+/**
+ * Require an elevated admin role (super_admin, admin, global_admin, or server_admin).
+ * Prefer requirePermission() for new routes — this helper exists for legacy call sites.
+ */
+function requireAdmin(req, res, next) {
+    if (!req.session || !req.session.userId) {
+        if (req.path.startsWith('/api/')) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+        return res.redirect('/login');
+    }
+    
+    const userRole = req.session.user && req.session.user.role;
+    const allowed = isSuperAdminRole(userRole)
+        || userRole === 'global_admin'
+        || userRole === 'server_admin';
+    if (!allowed) {
+        if (req.path.startsWith('/api/')) {
+            return res.status(403).json({ success: false, error: 'Admin access required' });
+        }
+        return res.status(403).render('errors/403', {
+            title: 'Forbidden',
+            message: 'You do not have permission to access this resource'
+        });
+    }
+    
+    res.locals.user = req.session.user;
+    next();
+}
+
+/**
+ * Require a specific granular permission (RBAC Phase 52).
+ * Uses the default role-permission map. Admin role always passes.
+ * @param {string} permission - e.g. 'device.view', 'user.edit'
+ */
+function requirePermission(permission) {
+    return function(req, res, next) {
+        if (!req.session || !req.session.userId) {
+            if (req.path.startsWith('/api/')) {
+                return res.status(401).json({ success: false, error: 'Unauthorized' });
+            }
+            return res.redirect('/login');
+        }
+
+        const role = req.session.user && req.session.user.role;
+        if (req.permissionContextLoaded && req.permissionLoadError) {
+            if (req.path.startsWith('/api/')) {
+                return res.status(503).json({
+                    success: false,
+                    error: 'Permission service unavailable',
+                    code: 'permission_service_unavailable'
+                });
+            }
+            return res.status(503).render('errors/500', {
+                title: 'Service unavailable',
+                message: 'Permission service unavailable'
+            });
+        }
+        if (!requestHasPermission(req, permission)) {
+            if (req.path.startsWith('/api/')) {
+                return res.status(403).json({ success: false, error: `Permission denied: ${permission}` });
+            }
+            return res.status(403).render('errors/403', {
+                title: 'Forbidden',
+                message: 'You do not have permission to access this resource'
+            });
+        }
+
+        res.locals.user = req.session.user;
+        next();
+    };
+}
+
+module.exports = {
+    requireAuth,
+    requireRole,
+    requireAdmin,
+    requirePermission,
+    requireRdClientAuth,
+    rdClientGuestOnly,
+    normalizeRdClientReturnUrl,
+    isSafeRdClientReturnUrl,
+    optionalAuth,
+    guestOnly,
+    roleHasPermission,
+    requestHasPermission,
+    roleHasEffectivePermission,
+    loadEffectivePermissions,
+    isSuperAdminRole
+};

@@ -1,0 +1,213 @@
+# =============================================================================
+# BetterDesk Console - Quick Start (Pre-built Images) — legacy split layout
+# =============================================================================
+# NO BUILD REQUIRED — uses pre-built images from GitHub Container Registry (ghcr.io).
+# Prefer the official all-in-one image: docker-compose.quick.single.yml (or install.sh).
+#
+# THIS FILE is the GHCR path: `docker compose pull` refreshes betterdesk-server /
+# betterdesk-console. Do NOT confuse with docker-compose.yml (source build),
+# which uses betterdesk-*:local and pull_policy: never — pull does nothing there.
+#
+# Image tag (aligned with VERSION / CHANGELOG):
+#   Default: 3.5.182  |  Rolling: BETTERDESK_IMAGE_TAG=latest | Dev: BETTERDESK_IMAGE_TAG=dev
+#
+# Usage (automated — recommended):
+#   curl -fsSL https://raw.githubusercontent.com/UNITRONIX/BetterDesk/main/install.sh | sudo bash
+#   # legacy split:  … | sudo bash -s -- --split
+#
+# Usage (manual):
+#   curl -fsSL https://raw.githubusercontent.com/UNITRONIX/BetterDesk/main/docker-compose.quick.yml -o docker-compose.yml
+#   docker compose pull && docker compose up -d
+#
+# Pin a specific release / channel:
+#   BETTERDESK_IMAGE_TAG=3.5.182 docker compose up -d
+#   BETTERDESK_IMAGE_TAG=dev docker compose pull && docker compose up -d
+#
+# Port map (split layout):
+#   :5000  — web panel (Node) — do NOT point RustDesk API Server here
+#   :21114 — Go Client API (RustDesk /api/login, AB) — preferred
+#   :21121 — optional Node → Go compat proxy (legacy fleets)
+#   :21118 / :21119 — native RustDesk WSS signal / relay
+#
+# Web Console: http://localhost:5000
+# RustDesk client API: http://localhost:21114 (Go server — not the console port)
+# SQLite: both services share the primary database at
+# /opt/rustdesk/db_v2.sqlite3. Legacy auth.db is optional and only used for
+# unmigrated deployments.
+# Default credentials are written to the shared credentials file:
+#   docker compose exec console betterdesk-show-admin-credentials
+#
+# MACVLAN / dedicated LAN IP: use docker-compose.quick.macvlan.yml instead
+# (console shares the server network namespace; that file may use DB_PATH under
+# /app/data). See docs/docker/DOCKER_QUICKSTART.md
+#
+# TROUBLESHOOTING: If you get "denied" or "pull access denied" error,
+# images may not be published yet. Build from source instead:
+#   git clone https://github.com/UNITRONIX/BetterDesk.git
+#   cd BetterDesk && docker compose -f docker-compose.yml up -d --build
+# =============================================================================
+
+services:
+  # BetterDesk Server (Go) — handles signal, relay, and API
+  server:
+    image: ghcr.io/unitronix/betterdesk-server:${BETTERDESK_IMAGE_TAG:-3.5.272}
+    container_name: betterdesk-server
+    hostname: betterdesk-server
+    command: ["/usr/local/bin/betterdesk-server", "-mode", "all", "-api-port", "21114", "-key-file", "/opt/rustdesk/id_ed25519"]
+    ports:
+      - "21114:21114"           # Go HTTP API (default — RustDesk client + REST)
+      - "21115:21115"           # NAT type test
+      - "21116:21116/tcp"       # Signal TCP
+      - "21116:21116/udp"       # Signal UDP
+      - "21117:21117"           # Relay TCP
+      - "21118:21118"           # WebSocket Signal
+      - "21119:21119"           # WebSocket Relay
+    volumes:
+      - betterdesk-data:/opt/rustdesk
+      # Read-only: console stores folders/groups/ACL in auth.db (SQLite mode).
+      - console-data:/app/data:ro
+    environment:
+      - ENCRYPTED_ONLY=1
+      # Keep Go and Node.js on the same primary SQLite database.
+      - DB_URL=/opt/rustdesk/db_v2.sqlite3
+      # RustDesk client folders/groups (issue #138). Ignored when DB_URL is postgres://.
+      - AUTH_DB_PATH=/app/data/auth.db
+      # Admin credentials (first run only; existing users are not overwritten).
+      # Do NOT comment these out — host ADMIN_PASSWORD only reaches the container when mapped (issue #385).
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - INIT_ADMIN_USER=${ADMIN_USERNAME:-admin}
+      - INIT_ADMIN_PASS=${ADMIN_PASSWORD:-}
+      - SQLITE_AUTH_DB_MODE=${SQLITE_AUTH_DB_MODE:-}
+      # Set this when clients are outside the Docker network. Use the host's
+      # public IP/DNS, or the host LAN IP for LAN-only deployments.
+      # Example: RELAY_SERVERS=203.2.1413.10:21117 docker compose up -d
+      - RELAY_SERVERS=${RELAY_SERVERS:-}
+      - SIGNAL_RATE_LIMIT_PER_IP=${SIGNAL_RATE_LIMIT_PER_IP:-20}
+      - ALLOW_LEGACY_OUTBOUND=${ALLOW_LEGACY_OUTBOUND:-N}
+      # Web Remote (#465 / #313): console PunchHole arrives from the Docker
+      # bridge IP (not loopback). Default trusts compose 172.16/12 + loopback.
+      # On a shared Docker host, override to the console container /32.
+      - PANEL_SIGNAL_PROXY_CIDRS=${PANEL_SIGNAL_PROXY_CIDRS:-172.16.0.0/12,127.0.0.0/8,::1/128}
+      # Enrollment policy. Fresh volumes default to "managed" (operator approves
+      # new devices); pre-existing volumes keep their current mode. Override with
+      # "open", "managed", or "locked".
+      - ENROLLMENT_MODE=${ENROLLMENT_MODE:-}
+      - NTP_SERVERS=${NTP_SERVERS:-pool.ntp.org,time.google.com,time.cloudflare.com}
+      - BILLING_MAX_CLOCK_SKEW_MS=${BILLING_MAX_CLOCK_SKEW_MS:-2000}
+      - BILLING_REQUIRE_SYNCED_CLOCK=${BILLING_REQUIRE_SYNCED_CLOCK:-1}
+      - BILLING_TRUST_OS_NTP=${BILLING_TRUST_OS_NTP:-Y}
+      # Optional: map betterdesk to host bind-mount owner (Synology etc.). Default 10001.
+      - PUID=${PUID:-10001}
+      - PGID=${PGID:-10001}
+    networks:
+      - betterdesk-net
+    restart: unless-stopped
+    # SECURITY (audit fix L-02, 2026-04-10): drop all capabilities except
+    # those needed by the entrypoint to chown volumes + su-exec to non-root.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - FOWNER
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:21114/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # BetterDesk Console — Web Management Interface
+  console:
+    image: ghcr.io/unitronix/betterdesk-console:${BETTERDESK_IMAGE_TAG:-3.5.272}
+    container_name: betterdesk-console
+    hostname: betterdesk-console
+    ports:
+      - "5000:5000"             # Web console (admin panel)
+    volumes:
+      - betterdesk-data:/opt/rustdesk
+      - console-data:/app/data
+    environment:
+      - NODE_ENV=production
+      # Set TRUST_PROXY=1 when this console is behind one reverse proxy.
+      - TRUST_PROXY=${TRUST_PROXY:-}
+      - PORT=5000
+      - HOST=0.0.0.0
+      - API_HOST=0.0.0.0
+      - API_ENABLED=false
+      - SERVER_BACKEND=betterdesk
+      - BETTERDESK_API_URL=http://betterdesk-server:21114/api
+      - RUSTDESK_PATH=/opt/rustdesk
+      - DATA_DIR=/app/data
+      - BETTERDESK_CLIENT_REPO=${BETTERDESK_CLIENT_REPO:-UNITRONIX/BetterDesk-Client}
+      - BETTERDESK_CLIENT_RELEASE_TAG=${BETTERDESK_CLIENT_RELEASE_TAG:-}
+      - BETTERDESK_GITHUB_TOKEN=${BETTERDESK_GITHUB_TOKEN:-}
+      - BETTERDESK_CUSTOM_CLIENT_SIGNING_SEED=${BETTERDESK_CUSTOM_CLIENT_SIGNING_SEED:-}
+      - AGENT_ARTIFACT_DIR=/app/data/agent-builds
+      - AGENT_BUILD_WORKER=${AGENT_BUILD_WORKER:-on}
+      - AGENT_BUILD_POLL_MS=${AGENT_BUILD_POLL_MS:-5000}
+      - AGENT_BUILD_COOLDOWN_MS=${AGENT_BUILD_COOLDOWN_MS:-1000}
+      - DB_PATH=/opt/rustdesk/db_v2.sqlite3
+      # Optional public client endpoints (IaC). Non-empty values override the panel
+      # file at /app/data/public-endpoints.env. Leave unset to use Settings UI.
+      # Do not set empty PUBLIC_*= keys — empty env must not wipe durable values.
+      # - PUBLIC_SERVER_ID=gateway.example.net
+      # - PUBLIC_RELAY_SERVER=gateway.example.net
+      # - PUBLIC_API_URL=https://api.example.net:21121
+      # Admin credentials (first run only; existing users are not overwritten).
+      # Do NOT comment these out — host ADMIN_PASSWORD only reaches the container when mapped (issue #385).
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - DEFAULT_ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - SQLITE_AUTH_DB_MODE=${SQLITE_AUTH_DB_MODE:-}
+      - PUB_KEY_PATH=/opt/rustdesk/id_ed25519.pub
+      - API_KEY_PATH=/opt/rustdesk/.api_key
+      - WS_HBBS_HOST=betterdesk-server
+      - WS_HBBS_PORT=21116
+      - WS_HBBR_HOST=betterdesk-server
+      - WS_HBBR_PORT=21117
+      - DOCKER=true
+      # Optional: map betterdesk to host bind-mount owner (Synology etc.). Default 10001.
+      - PUID=${PUID:-10001}
+      - PGID=${PGID:-10001}
+      - BETTERDESK_UPDATE_MODE=image
+      - BETTERDESK_DOCKER_LAYOUT=split
+      - BETTERDESK_IMAGE_TAG=${BETTERDESK_IMAGE_TAG:-3.5.272}
+    networks:
+      - betterdesk-net
+    depends_on:
+      # service_started (not healthy): server entrypoint waits for auth.db while
+      # console creates it on first boot — avoids deadlock on fresh installs.
+      server:
+        condition: service_started
+    restart: unless-stopped
+    # L-02: drop caps + no privilege escalation for Node.js console.
+    # SETUID/SETGID needed by su-exec; CHOWN/FOWNER for volume permissions.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - FOWNER
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  betterdesk-net:
+    driver: bridge
+
+volumes:
+  betterdesk-data:
+    name: betterdesk-data
+  console-data:
+    name: betterdesk-console-data

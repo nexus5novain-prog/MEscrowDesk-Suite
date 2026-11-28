@@ -1,0 +1,5387 @@
+## [Unreleased]
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.272] — 2026-11-22
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.271] — 2026-11-22
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.270] — 2026-11-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.269] — 2026-11-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.268] — 2026-11-18
+
+### Changed
+- Devices address-book aliases in BetterDesk mode now read and write the Go-owned
+  `address_books` data through the panel trust bridge, so legacy RustDesk clients,
+  SQLite consolidated/legacy deployments and PostgreSQL use the same source of
+  truth. The full legacy address-book document remains intact when one alias is
+  changed.
+- Server binary updates now stop before attempting an unwritable root-owned
+  target and report the required root deploy step clearly. After a validated
+  manual deploy, the panel automatically clears the stale-binary warning when
+  the source and service binaries are byte-identical.
+
+---
+
+## [3.5.267] — 2026-11-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.266] — 2026-11-18
+
+### Changed
+- Devices now show the logged-in user's RustDesk legacy address-book alias in an optional, searchable and sortable column. Editing the alias writes only to that user's address book and does not change the global device name.
+
+---
+
+## [3.5.265] — 2026-11-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.264] — 2026-11-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.263] — 2026-11-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.262] — 2026-11-18
+
+### Security
+
+- **Relay WebSocket DoS (GHSA-98mc-f6p7-gj85, high).** `crypto.timingSafeEqual`
+  was called with attacker-supplied relay tokens without a length check. It throws
+  `RangeError` on mismatched lengths, the `'connection'` listener had no try/catch,
+  and the process has no `uncaughtException` handler — so one enrolled device
+  could terminate the console and drop every relayed session by sending a token of
+  the wrong length. Lengths are now compared first, values are `String()`-coerced,
+  and the listener keeps a failure local to the socket.
+- **CDAP API key expiry bypass (GHSA-7j6j-h4qf-86mq, high).** The CDAP agent
+  authentication path looked keys up without checking `expires_at`, so an expired
+  key authenticated agent connections indefinitely while the REST API correctly
+  rejected it. Expiry is now enforced on both paths.
+- **Remote-viewer device scope (GHSA-22mg-g52q-x75c).** `/ws/remote-viewer/:device_id`
+  verified `device.connect` but never checked that the user may access *that*
+  device, so an operator whose device scope or group ACL excluded a device could
+  still watch its screen and inject input. The upgrade now runs the same
+  `userCanAccessDevice` check as `remoteTargetGateway`; an out-of-scope device
+  answers 404, identical to a device that does not exist.
+- **Database password in startup log (GHSA-qxwx-jg77-5v67, moderate).** The
+  banner printed the PostgreSQL DSN verbatim, writing the database password to
+  container logs on every start. Credentials are now redacted; SQLite paths are
+  unchanged.
+
+### Fixed
+
+- **Web Console CI and Installer CI no longer fail on every push.** Both ran
+  `tests/updateService.channel.test.js`, which spied on the exported
+  `updateService.checkGoAvailable` while `runUpdatePreflight` called the module-local
+  function directly. The mock never applied, so the result depended on the runner's
+  Go version: it passed on older Go and failed on CI. The function now calls through
+  `module.exports`, making the seam spy-able and the test deterministic.
+- Translated the 58 `users.access_*` / `users.client_features` keys introduced with
+  panel access policies into all 24 non-English locales, and removed four legacy
+  `meta.*` keys from `fr` and `zh-TW` that fell outside the EN/PL baseline.
+
+### CI
+
+- Added a blocking i18n parity gate to Web Console CI. Hard failures (missing,
+  extra, or empty keys) stop the build; the pre-existing English fallback backlog is
+  reported without failing.
+- Upgraded all GitHub Actions to their Node 24 major versions (checkout v7,
+  setup-node v7, setup-go v7, upload-artifact v7, download-artifact v8,
+  setup-python v7, build-push-action v7, codeql-action v4), still pinned to commit
+  SHAs. This clears the Node 20 deprecation warning on every run.
+- Added `concurrency` groups and `timeout-minutes` to every workflow and job;
+  duplicate pushes now cancel superseded runs instead of queueing.
+- Added a GHCR preflight to the Docker publish workflow. The 2026-11-18 failure was
+  `permission_denied ... circuit breaker is open` from GitHub's registry
+  authorization service, not a build error. The preflight retries briefly and then
+  reports an infrastructure failure instead of a false red build.
+
+---
+
+## [3.5.260] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.259] — 2026-11-17
+
+### Changed
+- Web RdClient now provides a shared bidirectional clipboard bridge for text, HTML, and PNG images across the operator and multiple remote sessions. Browser permission failures retain the content in the session hub and expose a user-gesture copy action; Explorer file clipboard remains desktop-only.
+
+---
+
+## [3.5.258] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.257] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.256] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.255] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.254] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.253] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.252] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.251] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.250] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.249] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.248] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.247] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.246] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.245] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.244] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.243] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.242] — 2026-11-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.241] — 2026-11-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.240] — 2026-11-13
+
+### Fixed
+- **Enrollment tokens were ignored in `managed` mode.** The most common
+  operator-facing enrollment mode queued every registration for manual approval,
+  including devices presenting a valid token — an unattended install (Docker
+  image, MDM script, golden image) therefore waited for a human click forever,
+  and nothing in the answer said why. A valid unbound token now admits the device
+  immediately and issues its device credential; an invalid or already-bound token
+  is refused with `403 enrollment_token_rejected` instead of being queued as if
+  it were fine. The queue path is unchanged for devices without a token.
+- Both `managed` and `locked` now share one redemption helper, so the token rules
+  (exists, active, unbound or bound to this exact device, uses remaining) apply
+  identically in each mode.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.239] — 2026-11-13
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.238] — 2026-11-13
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.237] — 2026-11-13
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.236] — 2026-11-13
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.235] — 2026-11-13
+
+### Security
+- **Device registration is authenticated (C1).** `POST /api/bd/register` now
+  needs proof that the device was admitted: operator approval in the
+  **Registrations** tab, a single-use enrollment token from
+  `POST /api/bd/enroll`, or an Ed25519 proof of possession
+  (`bd-enrollment-v1` headers). Banned and soft-deleted device ids are rejected
+  before anything is written, and the endpoint is rate limited to 20
+  requests/min per IP (`BD_REGISTER_RATE_LIMIT_MAX`). Stock RustDesk clients and
+  Support Agents keep working unchanged — they were always admitted through
+  approval or a token, and that path is preserved.
+  `BD_REGISTER_ALLOW_OPEN=true` restores the old unauthenticated behaviour for
+  integrators that cannot sign.
+- **Enrollment actually works (fixed alongside C1).** `POST /api/bd/enroll` and
+  the agent-template tab called `db.get()` / `db.query()`, which the database
+  facade never exposed, so every enrollment token answered `401`; PostgreSQL
+  installs had no `agent_templates` table at all. The template store now lives in
+  `lib/agentTemplates.js` with adapter methods for both backends, tokens are
+  single-use and bound to one `device_id` (`enrolled_device_id`), and the table is
+  created by the adapter schema on SQLite and PostgreSQL alike.
+- **Signal ID change requires identity proof (C2).** A `RegisterPk` carrying
+  `old_id` is applied only when the supplied key or the machine UUID matches the
+  stored peer, so knowing a device id is no longer enough to move or delete it.
+  Stock RustDesk change-ID (no `pk`, matching UUID) keeps working.
+- **Panel can no longer escalate to root (C3, H10).** The Go server runs as
+  `betterdesk` from `/usr/local/bin/betterdesk-server`; `/opt/rustdesk` is no
+  longer group-writable at the directory level, so the console user cannot
+  replace the server binary. The privileged broker no longer manages
+  `DATABASE_URL`, `SESSION_SECRET`, `DEFAULT_ADMIN_PASSWORD`,
+  `UPDATE_GITHUB_TOKEN`, `API_KEY_PATH`, `ORG_PEER_VAULT_KEY`, `SMTP_PASS` or
+  `API_TOKEN_EXPIRY_DAYS`, and reports a protocol `version` so a stale broker is
+  detectable.
+- **Go API surface (H1, M5-M8).** `/metrics` and the detailed health payload
+  (`/api/health/detail`) require the metrics allowlist or an API key; public
+  `/api/health` returns only `{status, version}`. Peer status / online / metrics
+  / linked / policy endpoints now require `device.view` and enforce organisation
+  scope. Audit write endpoints are rate limited. `limit`/`offset` are clamped to
+  500/10000 on both sides.
+- **Panel authentication (H4, M1-M3).** Panel login consults the shared
+  account-lockout tracker and returns `429` with `Retry-After`; delegated 2FA
+  fails closed (`503`) when the Go server is unreachable; the pending-2FA state
+  is written after session regeneration; `GET /logout` no longer destroys the
+  session (use the POST endpoint).
+- **Host and secrets (H2, H3).** Database DSNs and the bootstrap admin password
+  are no longer written into systemd units; plaintext `admin_credentials.txt`
+  files are moved out of the application directory and created `0600 root` only
+  when `STORE_ADMIN_CREDENTIALS=true` (now off by default and no longer settable
+  from the panel).
+- **Redirect and enumeration (H5, H6).** The HTTP→HTTPS redirect builds its
+  `Location` from configuration or the bound listener address instead of the
+  `Host` header, and refuses absolute request targets. The desktop login no
+  longer pre-renders the account list; a rate-limited `/login/lookup` returns at
+  most 8 prefix matches.
+- **Authorisation (H7, H9).** Panel section overrides are clamped to the role
+  ceiling, so a per-user policy cannot grant a permission the role lacks.
+  `/api/devices/:id/*` is covered by one scope guard, closing the gap on tags,
+  rename, change-id, restore and access-policy deletion.
+- **Update integrity (H8).** `applyUpdate` verifies an optional Ed25519-signed
+  manifest (`UPDATE_MANIFEST_PUBLIC_KEY`); `UPDATE_REQUIRE_SIGNED_MANIFEST=true`
+  makes an unsigned update fail closed.
+- **Archive extraction (M4).** Backup restore enforces a decompressed-size and
+  entry-count budget (`BACKUP_MAX_DECOMPRESSED_BYTES`, `BACKUP_MAX_ENTRIES`)
+  instead of expanding the whole upload into memory.
+- **Template escaping (M11).** All data embedded in inline `<script>` blocks is
+  serialised through `lib/safeJsonScript.js`, and the pairing page escapes the
+  suggested host.
+- **Toolchain (M14).** Go toolchain and builder images bumped to `go1.26.11`
+  (GO-2026-6859, `net/http`); the console requires at least that version to
+  rebuild the server. Workflow Actions are pinned to commit SHAs.
+
+### Added
+- **Administrator username can be changed (issue #498).** `PATCH /api/users/:id`
+  accepts `username` for local accounts: the rename cascades to the address book,
+  organisation membership, strategy assignments and lockout history in one
+  transaction, and the panel unlocks the field in the edit dialog with a warning.
+  LDAP/OIDC accounts keep the name their provider issues. Account names now allow
+  `A-Z a-z 0-9 . _ @ -` (3-64 characters).
+- `lib/enrollmentProof.js`, `lib/redirectHost.js`, `lib/safeJsonScript.js`,
+  `lib/updateManifestSignature.js`, `lib/renameUserCascade.js`.
+- `scripts/security/pentest-local.sh` / `.ps1` local security gate and
+  `scripts/check-security-regressions.sh` CI gate.
+- `docs/security/AUDIT_2026-11-13.md` with the full report and fix status.
+- Regression tests: device registration, signal ID change, broker manifest,
+  panel auth, redirect host, login enumeration, device scope, panel access
+  ceiling, update signature, archive limits, Go audit limits, template escaping.
+
+### Fixed
+- Two long-standing red tests (`devices.routes`, `users.routes`) caused by a
+  platform-specific loopback address and a missing `panelAccessPolicyService`
+  mock.
+
+---
+
+## [3.5.234] — 2026-11-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.233] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.232] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.231] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.230] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.229] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.228] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.227] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.226] — 2026-11-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.225] — 2026-11-11
+
+### Added
+- **UX 3.6 beta: global search, section "More" rows, and the beta rhythm on every page.**
+  Continues the EJS port of the redesign by
+  [@rathlinus](https://github.com/rathlinus)
+  ([issue #493](https://github.com/UNITRONIX/BetterDesk/issues/493),
+  [PR #495](https://github.com/UNITRONIX/BetterDesk/pull/495)).
+  **Ctrl+K** (or **/** when no field has focus) opens one dialog that searches
+  pages, devices and people (`web-nodejs/public/js/ui-search.js`). Pages come
+  from `buildSearchPages()` in `web-nodejs/lib/consoleNav.js`, built per request
+  and filtered by panel access and RBAC, so the index only lists pages the
+  role may open; entries carry extra search words so old names ("Keys",
+  "DataGuard", "Fleet") still find the page. Devices and people load on first
+  use from `/api/devices` and `/api/users`, and only when the new
+  `window.BetterDesk.searchCaps` flags allow those calls.
+  Long sidebar sections keep their daily pages visible and fold the rest into a
+  section-level **More** row (count badge, remembered per browser in
+  `bd_ux36_nav_more_open`); the menu filter now exists in the beta sidebar too,
+  matches inside "More" rows and opens them. Width, collapsed groups, "More"
+  rows and the scroll position are restored by an inline script before the
+  first paint, so the menu never jumps. Settings search reports when the typed
+  words name another topic (`settings.ui.search_topic`).
+  The remaining pages keep their markup and take the beta rhythm from
+  `web-nodejs/public/css/ux36/pages.css` — one content column, ruled sections
+  instead of floating cards, stat numbers in one ruled row, page tabs as a
+  ruled row, hairline tables; Chat and Remote stay full-bleed workspaces.
+  `tokens.css` gains `--radius-full`, the icon subset gains `more_horiz`, and
+  `nav.more` / `nav.fewer` / `search.*` / `settings.ui.search_topic` exist in
+  all 26 locales. UX 3.5 markup, routes, permissions and branding are
+  unchanged. Covered by the new `tests/ux36-all-pages.render.test.js` (every
+  main-layout view in both shells) plus the existing UX 3.6 suites.
+  Ships via panel update.
+
+### Changed
+- **Console backend moves toward the Go server, stage by stage.**
+  Implements P1–P3 of [docs/important/console-backend-strangler.md](docs/important/console-backend-strangler.md)
+  (follow-up to the architecture question in
+  [discussion #496](https://github.com/UNITRONIX/BetterDesk/discussions/496)).
+  - **Panel trust bridge (P1).** `X-BetterDesk-Panel` carries a short-lived
+    HMAC-SHA256 statement (method, path, subject, role, org, issue/expiry,
+    nonce) signed by the console with `PANEL_TRUST_SECRET`. Go verifies the
+    signature, the window, the replay nonce and the endpoint, accepts it only
+    from loopback or `PANEL_TRUST_ALLOWED_HOSTS`, and takes the role from the
+    database when the account still exists. With no secret the bridge is off
+    and authentication is exactly as before. `api/panel_trust_test.go` covers
+    thirteen rejection paths including cross-endpoint and cross-method replay
+    and role escalation.
+  - **Panel grouping (P2).** Go now owns the writes for device groups, their
+    members and ACL, folders, device→folder assignment and per-user device
+    grants (`api/panel_groups_handlers.go`, `db/panel_groups*.go`), and creates
+    the tables on SQLite that it previously only read. The console keeps its
+    screens and response shapes through `services/panelGrouping.js`;
+    `BACKEND_PANEL_GROUPING=node` restores the old writer without a redeploy,
+    and a 404/501/503 falls back automatically while a 400/403 is final.
+  - **Panel catalog (P3, definition half).** `GET /api/panel/catalog` serves
+    the section list, groups, permission vocabulary and built-in role defaults;
+    the console loads it at startup and keeps its bundled copy only as the
+    fallback. `tests/panelCatalogParity.test.js` fails if the two definitions
+    drift apart. This also removed a duplicate `toolkit` catalog entry.
+  No behavioural change without the new `.env` keys; both are appended by the
+  updater when missing and never overwritten. Ships via panel update (Go
+  server restart).
+- **Access control strategies moved off the Devices page to their own page.**
+  The RustDesk Pro strategy list was a card halfway down the device list, below
+  the folder rail and above the table — nobody found it there.
+  It is now **`/strategies`**, listed in the sidebar with the other security
+  rules (group *Rules & policies*, next to Policies, Automation, DataGuard and
+  Attestation) in both shell layouts, and in the Ctrl+K search index.
+  The list, the edit and assign dialogs, the permission grid and every endpoint
+  (`/api/panel/strategies`, `/api/panel/user-groups`, `/api/device-groups`,
+  `/api/devices`) are unchanged — the code moved from `devices.js` to its own
+  `public/js/strategies.js` and `views/strategies.ejs`, and the row styles stay
+  in `devices.css` where the markup still uses them.
+  Access is gated by the existing `strategies` panel section (read
+  `device.view`, write `device.edit`), so a role that could manage strategies
+  before still can and nobody else gains access. The Devices page keeps one
+  quiet link to the new page, so the old location still leads somewhere.
+  Covered by `tests/strategies-page.test.js`, which also fails if the card is
+  ever rendered on the Devices page again.
+  Ships via panel update.
+
+### Fixed
+- **UX 3.6: the page column scrolls again; Devices no longer traps its list.**
+  The beta shell declared only `min-height` for the shell and set
+  `overflow: visible` on the content column while telling the document to
+  scroll — but `body.app-page` (main.css) clips overflow, so nothing scrolled at
+  all. A long table grew the shell past the viewport instead of scrolling, which
+  made the Devices list impossible to scroll vertically and left the floating
+  horizontal scrollbar at the bottom of the list instead of the bottom of the
+  screen.
+  The beta shell now mirrors the UX 3.5 chain: `.ux35-shell` fills `100dvh` and
+  clips, `.ux35-main` clips, and `.ux35-content.main-content` is the single
+  scrollport (`flex: 1; min-height: 0; overflow-y: auto`). Embedded windows keep
+  sizing to their content. The sidebar is no longer `position: sticky` (it would
+  be offset by the top bar inside a shell that does not scroll) and simply fills
+  its column; the drawer below 1100 px stays fixed with `height: auto`. The
+  device-rail sticky offset in `ux36/pages.css` is measured from the scrollport
+  instead of the document. The floating horizontal scrollbar now also sits above
+  the docked mobile bottom navigation instead of behind it.
+  Guarded by `tests/ux36-scroll-chain.test.js`, which pins the scroll chain, the
+  sidebar rule and the scrollbar anchoring, because all three are easy to break
+  by removing one `overflow` in isolation.
+  Ships via panel update.
+
+---
+
+## [3.5.224] — 2026-11-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.223] — 2026-11-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.222] — 2026-11-09
+
+### Added
+- **UX 3.6 beta console shell (opt-in).** An alternative layout built on the
+  design system of the community redesign by
+  [@rathlinus](https://github.com/rathlinus)
+  ([issue #493](https://github.com/UNITRONIX/BetterDesk/issues/493),
+  [PR #495](https://github.com/UNITRONIX/BetterDesk/pull/495)) and rebuilt on the
+  current EJS/JavaScript/CSS stack — no Svelte, no merged branch.
+  The beta loads his own sheets (`web-nodejs/public/css/ux36/`): `palette.css`
+  (his neutral dark scale and white-based light theme), `tokens.css`,
+  `base.css` (IBM Plex Sans/Mono typography, page column), `components.css`
+  (buttons, fields, tables, menus, tags, notices) and `shell.css` (top bar,
+  grouped navigation, content column, mobile bar). `legacy-bridge.css` maps his
+  token names onto the v2 names the remaining page sheets use, so one page never
+  mixes two type or spacing scales.
+  The sidebar is grouped into **Devices / Support / People / Activity / Settings**
+  (`web-nodejs/lib/consoleNav.js`) with a `<ul>` per section, section icons and
+  group labels; every entry keeps its existing route and panel-access section,
+  so roles see exactly the pages they could open before. Devices is list-first
+  with folders and device groups in a 210px rail beside the table and details in
+  a side sheet on desktop; Settings uses a ruled topic row plus `?tab=` deep
+  links; Dashboard stats read as one ruled row instead of floating cards.
+  The switch sits in the **top bar** on every page — a small **BETA** badge in
+  UX 3.5, and in UX 3.6 the same button returns to UX 3.5 (repeated at the
+  bottom of the sidebar). **Settings → General → Console interface** offers the
+  same choice with the design credit.
+  UX 3.5 stays the default and the safe fallback: the shell is resolved once in
+  `web-nodejs/lib/uiShell.js`, stored per browser in the `bd_ui_shell` cookie.
+  Unknown or removed values (including `classic`) fall back to UX 3.5. No database
+  migration and no change to routes, permissions, branding, wallpapers or the
+  operator's custom colours (the beta palette is skipped for `custom` theme mode).
+  New `ux36.*` and grouped `nav.*` keys in all 26 locales. Covered by
+  `web-nodejs/tests/ux36-shell.test.js`, `ux36-pages.render.test.js` and
+  `ux36-ui-shell.routes.test.js`, plus the updated `ux35-ui-contract.test.js`.
+  IBM Plex fonts (SIL OFL 1.1) ship under `web-nodejs/public/fonts/` with their
+  licence file. Contributor credit is recorded in
+  `docs/development/CONTRIBUTOR-ATTRIBUTIONS.md` and
+  `.cursor/rules/ux36-attribution.mdc`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.221] — 2026-11-08
+
+### Fixed
+- **Console icons chosen in JavaScript no longer render as giant raw labels.**
+  The self-hosted Material Symbols subset was built by scanning view markup only, so
+  icons picked from a lookup table — the Pro role avatar (`roleIcons.pro = 'star'` in
+  `users.js` and `permissions.js`) most visibly — were never baked into the woff2. A
+  missing ligature makes the browser paint the icon name as ordinary text, which is the
+  oversized “STAR” overlapping the username in the users table. `shield_person` and
+  `engineering` had the same problem.
+  `scripts/update-material-symbols.mjs` now also collects names from icon lookup tables,
+  `icon = …` assignments and inline ternaries; the subset grew 341 → 357 icons
+  (`star`, `shield_person`, `engineering`, `audiotrack`, `picture_as_pdf`, `folder_zip`,
+  `drive_folder_upload`, `check_box`, `check_box_outline_blank`, `delete_outline`,
+  `remove_circle_outline`, `format_align_left`, `drag_handle`, `gps_fixed`, `factory`,
+  `pending`). `users.css` also clips the avatar so a stray ligature can never spill again,
+  and `tests/material-symbols-subset.test.js` now guards JS icon tables too.
+
+### Changed
+- **Users page is now a two-column layout.** The security best-practices card is gone.
+  User groups (with create) sit in a sticky left rail at 25% width; the users table
+  fills the remaining 75%. Below 1200px the columns stack. Covered by
+  `tests/usersLayout.test.js`.
+- **Users table actions moved to a right-click context menu.** The Actions column
+  (organizations / reset password / edit / delete icon row) is removed; right-click
+  a user row to open the same actions. Local-auth users still see Reset password;
+  LDAP/OIDC users do not. Clicking the Organizations cell still opens that modal.
+
+---
+
+## [3.5.220] — 2026-11-08
+
+### Changed
+- **Główne → agent pairing now issues a one-time code instead of opening the QR scanner.**
+  The button in the client-config card (previously **Activate agent**, QR scanner) and the
+  sidebar entry (**Activate agent**, now **Pair agent**) open a pairing-code dialog: server
+  address (prefilled from the resolved client address), optional label, code generation,
+  10-minute countdown and copy. Codes are minted through the existing
+  `POST /api/panel/pairing/codes` behind `enrollment.approve`; the plaintext is shown once
+  and never logged.
+  The QR scanner is still available — inside the dialog as **Scan agent QR** and on the full
+  `/pairing` page (active codes, revoke). `/?activateAgent=1` now opens the code dialog, so
+  existing bookmarks and shortcuts no longer land in the QR scanner.
+  New keys `nav.pair_agent`, `dashboard.pair_with_code`, `pairing.scan_qr_agent`,
+  `pairing.generating` in all 26 locales; `agents.*` copy (step 3, button, description) no
+  longer presents QR as the primary path.
+
+---
+
+## [3.5.219] — 2026-11-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.218] — 2026-11-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.217] — 2026-11-08
+
+### Fixed
+- **Console update rolled back on every instance (3.5.215/3.5.216):** `routes/pairing.routes.js`
+  shipped `require('../db')`, a module that has never existed in the repository. The update
+  itself applied cleanly, but the post-update integrity scan resolved that broken require to
+  `db.js`, requested `web-nodejs/db.js` from GitHub, received a **404** and classified it as a
+  **critical** failure — so the whole console update was rolled back to the previous SHA and
+  every panel stayed stranded below the new release. The import is now
+  `require('../services/database')`, matching every other route module.
+
+  No manual repair is needed: panels stuck on 3.5.214–3.5.216 pick the fix up with the next
+  panel update (Settings → Updates).
+
+### Added
+- **CI guard for console module integrity:** `web-nodejs/tests/consoleRequireIntegrity.test.js`
+  statically resolves every relative `require()` in the deployable console tree and fails when a
+  target file does not exist, plus smoke-requires every lazily loaded `routes/*.js`. `node --check`
+  only parses, and lazy route modules are not loaded during boot, so this was invisible to every
+  existing gate before it reached production.
+
+---
+
+## [3.5.216] — 2026-11-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.215] — 2026-11-08
+
+### Added
+- **Short-code pairing (`host` + 6 characters):** operator mints a one-time code on the new
+  `/pairing` page (Generator → pairing section); the user types only the server address and
+  the code. The client discovers the Client API itself (HTTPS first, then `:21114`, `:5443`),
+  applies signal/relay/API/key atomically, and continues with normal branding and
+  enrollment. Codes are 6 Crockford Base32 characters, valid 10 minutes, single use, stored
+  as sha256 only, and refused with an identical response whether unknown, expired or spent.
+  Endpoints: `POST /api/pairing/redeem`, `POST /api/pairing/config` (public, rate-limited
+  10/min/IP), `POST|GET /api/pairing/codes`, `DELETE /api/pairing/codes/{id}` (operator).
+- **`docs/CONNECTION_PORTS.md`:** single source of truth for ports — table, four firewall
+  profiles (minimal / reverse-proxy+TLS recommended / WSS-only / Docker), client-field map,
+  what pairing actually requires, and a common-mistakes table. Replaces the contradictory
+  guidance previously spread across the wiki, installers and `PORT_SECURITY.md`.
+- **Firewall verification:** `scripts/check-connection-ports.sh` (`a|b|c|d`) and the
+  PowerShell equivalent check real listeners against the chosen profile — a panel bound to
+  `0.0.0.0` or a WAN-exposed `21114` in profile B fails with a non-zero exit.
+- **CI gates:** `scripts/check-port-docs.js` fails when the cheat sheet and the port
+  constants in `constants.go` / `config.js` disagree (and when `21120` reappears as a live
+  port); `scripts/check-pairing-i18n.js` enforces the `pairing` namespace across all 26
+  locales. Both run in the secret-scan workflow.
+
+### Changed
+- **Installer firewall output:** `betterdesk.sh` `firewall-notes.txt` now lists **21114**
+  (previously missing) and separates WAN from localhost ports. `betterdesk.ps1` no longer
+  opens `5000`, `5443`, `21115`, `21118` or `21119` by default; it opens the documented
+  minimum (21116 TCP+UDP, 21117, Go API).
+- **Client branding docs:** `docs/README.md` marks `architecture/PORT_SECURITY.md` as
+  historical and points to `CONNECTION_PORTS.md`; `docs/wiki/Installation.md` no longer tells
+  operators to expose the panel to WAN.
+- **Docs — Docker quick start now leads with the all-in-one image:** `README.md`,
+  `docs/wiki/Home.md` and `docs/wiki/Installation.md` showed the legacy split layout
+  (`docker-compose.quick.yml`) as the only Docker path, even though `install.sh` and
+  `docs/docker/GHCR_PACKAGE_README.md` have defaulted to the all-in-one
+  `ghcr.io/unitronix/betterdesk` image since 3.3.114. New installs follow the single-container
+  layout now; the split layout moved into a collapsible "Legacy" block. No code change —
+  existing split deployments keep working unchanged (API port `21114` vs `21121` noted in
+  both places).
+
+### Fixed
+- **Stale port advice:** `docs/architecture/PORT_SECURITY.md` documented an API on
+  `127.0.0.1:21120` that never existed, and `docs/wiki/Installation.md` recommended
+  `API_PORT=21120` — a value the installer never used.
+
+### Notes for operators
+- No database migration. Pairing codes live in `server_config` under `pairing_code_<sha256>`
+  and are pruned automatically.
+- `/api/pairing/*` must be reachable for pairing: in profile B the proxy sends `/api` to
+  `21114`; without a proxy, open `21114` **over TLS**.
+- `21116/tcp+udp` and `21117/tcp` remain required — pairing configures the client but does
+  not carry the session.
+
+---
+
+## [3.5.214] — 2026-11-08
+
+### Fixed
+- **i18n key parity:** `en.json` was missing `commercialization.packages.select_org` and `commercialization.packages.select_org_placeholder`, which `pl.json` already had. EN now carries both, so parity is clean.
+- **CI i18n gate:** `npm run i18n:check` no longer fails on untranslated strings still falling back to English. Parity breaks, parse errors, missing keys and empty values stay blocking; the remaining translation backlog (~8.1k strings across 26 locales) is reported as a warning instead of turning the gate permanently red and hiding real regressions.
+
+---
+
+## [3.5.213] — 2026-11-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.212] — 2026-11-08
+
+### Changed
+- Restrict WAN `/api/currentUser` to GET and POST while preserving OPTIONS handling.
+
+---
+
+## [3.5.211] — 2026-11-08
+
+### Fixed
+- **Empty agent download portal (#439 / #475):** `/api/portal/installers` now returns a `reason` when it has nothing to list (`no_release_imported`, `release_cache_incomplete`, `cache_unreadable`). The public `/portal` page explains which one applies instead of showing a bare "No installers available yet."
+- **Flutter checksum during toolchain install (#466):** `scripts/install-build-toolchain.sh` no longer fetches `${url}.sha256`, which Flutter does not publish. The hash is resolved from Flutter's `releases_linux.json` manifest, and an unresolved hash now fails the install instead of skipping verification. Override with `FLUTTER_ARCHIVE_SHA256` when needed.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.210] — 2026-11-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.209] — 2026-11-08
+
+### Fixed
+- **Stable releases without binaries or images (#488):** `version-bump-main.yml` created the tag and GitHub Release with `GITHUB_TOKEN`, and `GITHUB_TOKEN`-produced events never trigger other workflows — so `release-server.yml` and `docker-publish.yml` never ran. 3.5.171 and 3.5.200 shipped a Release with zero assets, and GHCR never received the `3.5.200`/`latest` tags. The release job now dispatches both publishers explicitly on the tag ref, and a verification step fails the release when the Release still has no downloadable assets. `docker-publish` also accepts `latest` from a release tag, which it previously refused.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.208] — 2026-11-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.207] — 2026-11-01
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.206] — 2026-11-01
+
+### Fixed
+- **`follow-redirects` security update (#126):** the console now resolves the patched `1.16.2` release for Axios redirects. Verify with `npm ls follow-redirects` under `web-nodejs`.
+- **Production `minimatch` dependency chain (#127):** upgraded `bcrypt` to `6.0.0` and `ejs` to `7.0.2`, removing the vulnerable runtime `node-pre-gyp`/`glob` and `jake`/`filelist` paths. `npm audit --omit=dev` now reports zero vulnerabilities.
+- **Signed BetterDesk Client requests after re-enrollment (#484):** authorized fresh enrollment after permanent removal clears orphaned per-device telemetry replay state, while active and soft-deleted device IDs retain their existing replay protection. Existing 3.5.201 installations with a stale `telemetry_seq_<DEVICE_ID>` row require a database backup, removal of that exact row, an API restart, and an update to `dev`.
+- **Wrapped secure client requests (#484):** `X-BetterDesk-Envelope: 1` requests containing the `betterdesk_envelope` wrapper are accepted by the Go API. Ships via the panel/server update path.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.205] — 2026-10-31
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.204] — 2026-10-31
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.203] — 2026-10-31
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.202] — 2026-10-31
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.201] — 2026-10-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.200] — 2026-10-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.199] — 2026-10-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.198] — 2026-10-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.197] — 2026-10-30
+
+### Changed
+- **Docker `:dev` multi-arch AIO (#476):** All-in-one `ghcr.io/unitronix/betterdesk:dev` builds arm64 again on native runners (after amd64). Soft-merge keeps publishing amd64 if ARM fails. Verify: `docker buildx imagetools inspect ghcr.io/unitronix/betterdesk:dev` shows amd64 + arm64.
+
+---
+
+## [3.5.196] — 2026-10-27
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.195] — 2026-10-25
+
+### Fixed
+- **Login session-expired toast:** `/login?expired=1` shows the session message as a right-side toast instead of stretching the login card; wrong-password / TOTP / OIDC errors stay inline. Desktop login uses the same toast path. Ships via panel update.
+
+### Changed
+- **BetterDesk Agents replaces Client Generator UI:** Sidebar / dashboard no longer open the ALPHA in-panel build/bundle Generator (module gate, local toolchain, rebuild). New **/agents** page explains incoming-only Support agents, BetterDesk-Client releases, `/portal`, Import latest release, pairing, and Client Branding. Old `/generator` redirects to `/agents`. Import + portal APIs stay. Ships via panel update. Verify: Tools → BetterDesk Agents; Import still works; no ALPHA Generator chrome.
+- **Split login + promo slides:** Classic `/login` supports Branding layouts `classic` / `single` / `slides` (max 10 editable slides: image + separate title/body). Default BetterDesk slideshow starts with “free / open source”. Ships via panel update. Verify: Settings → Branding → Login layout; `/login` shows carousel on wide screens, form-only on mobile.
+
+---
+
+## [3.5.194] — 2026-10-25
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.193] — 2026-10-25
+
+### Fixed
+- **Settings tab bar flush + scroll (#396):** Settings scrollport drops top/side padding (`:has(.settings-shell)`) so sticky tabs sit flush under the topbar with zero gap (Chromium cannot stick into padding); content padding moves to page-header + settings main; horizontal swipe without scrollbar chrome; `overflow-y: hidden` on the track. Ships via panel update. Verify: Settings → scroll → tabs edge-to-edge under topbar, no gap.
+- **Settings choice cards spacing:** Enrollment / connection mode card grids get bottom margin before the following toggle rows (styles live in `pages.css`, which Settings actually loads).
+- **Mobile bottom-nav Remote:** “Zdalny” linked to non-existent `/remote-dashboard` (404); now opens `/remote` like the sidebar. Ships via panel update.
+- **Material Symbols subset (#393 follow-up):** Regenerated self-hosted fonts to include missing ligatures (`label`, `assignment`, `my_location`) that rendered as giant raw text next to Devices toolbar icons; toolbar icon buttons also clip overflow. Hard-refresh once after panel update.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.192] — 2026-10-25
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.191] — 2026-10-25
+
+### Fixed
+- **Web Remote work report overlay:** Skip/Submit now reliably hide the billing pane (`[hidden]` + `.hidden`); added missing `GET /api/panel/billing/check` panel proxy (toolbar package badge); connect-password returns 200 when no vault password (no console 404); report pane no longer uses a separate tinted background; report labels follow panel language (all locales).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.190] — 2026-10-25
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.189] — 2026-10-25
+
+### Fixed
+- **Generator Import latest release (#475):** allow GitHub Release asset redirects to `release-assets.githubusercontent.com` (same CDN allowlist as the Support Generator module). Fixes `generic_agent_release_redirect_host_invalid` when downloading signed `support-v*` artifacts. Ships via panel update.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.188] — 2026-10-25
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.187] — 2026-10-25
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.186] — 2026-10-23
+
+### Added
+- **Device tags management (#470):** Operators can rename or delete tags across all visible devices from Devices → Manage tags, unassign tags per device in Edit / Details / context menu, and matching dynamic group filters update on rename. Ships via panel update.
+
+### Changed
+- **Generator generic agent import UX (#474):** Import/status messages and `generic_agent_release_*` API errors are translated instead of showing raw codes (e.g. `generic_agent_release_not_found`). Ships via panel update.
+
+---
+
+## [3.5.185] — 2026-10-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.184] — 2026-10-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.183] — 2026-10-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.182] — 2026-10-20
+
+### Fixed
+- **WebRemote file transfer — parent directory navigation (#467):** climbing from `C:\Users\…` to the drive root no longer requests bare `C:` (Win32 cwd on that drive). Parent paths use `C:\` and then the drive list. Ships via panel update (static JS).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.181] — 2026-10-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.180] — 2026-10-20
+
+### Fixed
+- **Generator Download Hub i18n:** missing `generator.download_hub` / `rebuild` keys showed raw key paths in the UI; added across all locales (#466 follow-up).
+- **Docker split Web Remote `initiator_not_registered` (#465):** official split compose now defaults `PANEL_SIGNAL_PROXY_CIDRS` to the Docker bridge range (`172.16.0.0/12` + loopback) so panel PunchHole from the console container is accepted. Same class as #313; AIO single-container unchanged. Docs: DOCKER_TROUBLESHOOTING / QUICKSTART.
+
+### Changed
+- **Support agents are download-only by default:** import signed BetterDesk-Client GitHub releases instead of compiling on the panel host. `BETTERDESK_CLIENT_GENERATOR_MODE` defaults to `download`; `AGENT_BUILD_WORKER` defaults to `off`. Menu **B** / `install-build-toolchain` marked optional for maintainers. Refs #466.
+- **Główne → Aktywuj agenta:** sidebar entry opens Dashboard pairing QR scanner (`/?activateAgent=1`) for operators with `enrollment.approve`.
+
+---
+
+## [3.5.179] — 2026-10-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.178] — 2026-10-19
+
+### Security
+- Panel console sessions are now server-enforced with idle timeout (default 30 minutes),
+  absolute max age (default 24 hours), and a single active session per account.
+  A new login replaces any prior session; IP, User-Agent, optional client fingerprint,
+  start/last-activity/end times and end reason are audited. Configure via
+  `SESSION_IDLE_TIMEOUT`, `SESSION_MAX_AGE`, and `SESSION_IDLE_WARN_MS`.
+
+### Fixed
+- Panel updates behind a reverse proxy: clearer 502/504 handling and install-status
+  polling when the browser loses the long-running install request (~120s proxy
+  timeout). Go rebuilds use `GOTOOLCHAIN=local`, honor spawn timeouts, and report
+  kill/OOM signals instead of opaque `exited with code null` (#464).
+
+---
+
+## [3.5.177] — 2026-10-18
+
+### Fixed
+- Go Server release job: set `GH_REPO` so `gh` works without a git checkout (upload no longer
+  fails with `not a git repository`).
+
+---
+
+## [3.5.176] — 2026-10-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.175] — 2026-10-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.174] — 2026-10-18
+
+### Fixed
+- CI on `main`: retired in-repo desktop release + Rust cargo-audit workflows (clients build
+  in BetterDesk-Client); Go Server release upload creates a release if version-bump cannot
+  publish one; stable version-bump opens a PR instead of direct-push to protected `main`.
+
+---
+
+## [3.5.173] — 2026-10-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.172] — 2026-10-18
+
+### Added
+- Commercialization month periods (`billing_period_totals`, `BILLING_TIMEZONE`): history
+  survives monthly usage reset; sessions spanning midnight settle at the month boundary
+  without disconnecting; package limit edits do not rewrite past months.
+- Packages table month preview (PPM / side panel): company, devices, used / remaining /
+  overage / month total with period navigation.
+- Web Remote billing overlay: package badge, in-session report intent, split disconnect
+  card with work report; skipped reports stay `pending_report` in Sessions with
+  **Complete report**.
+- Settings → Time / timezones: NTP + billing timezone (`BILLING_TIMEZONE`) with OS detect;
+  Commercialization links to that tab.
+
+### Changed
+- Commercialization IA: Packages | Sessions only (overview/reports/settings tabs removed;
+  exports and gear settings live on those tabs).
+- Billing packages attach to device groups only; folders excluded; one manual group per
+  device; org create seeds a default device group.
+
+### Fixed
+- CI on `main`: retired in-repo desktop release + Rust cargo-audit workflows (clients build
+  in BetterDesk-Client); Go Server release upload creates a release if version-bump cannot
+  publish one; stable version-bump opens a PR instead of direct-push to protected `main`.
+
+---
+
+## [3.5.171] — 2026-10-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.170] — 2026-10-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.169] — 2026-10-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.168] — 2026-10-17
+
+### Security
+- Cleared OIDC discovery data race (`atomic` retry interval + `Close()`); Go
+  toolchain **1.26.9** and `golang.org/x/text` **v0.41.0** (govulncheck clean).
+- Multer disk cleanup confined to reconstructed paths under temp/`dataDir`;
+  generator upload cleanup uses the same confinement.
+- Support Generator GitHub downloads: HTTPS-only host allowlist with
+  `hostname`/`path` request options (SSRF guard).
+- Local Support Client builder: allowlisted toolchain basenames before spawn;
+  public generic-agent download rate-limited.
+- CodeQL Security noise cleared (real fixes + documented false-positive dismissals).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.167] — 2026-10-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.166] — 2026-10-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.165] — 2026-10-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.164] — 2026-10-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.163] — 2026-10-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.162] — 2026-10-17
+
+### Security
+- Bumped Node production dependencies for audited advisories: `axios` ≥1.20,
+  `multer` ≥2.4, `proxy-addr` ≥2.0.8, `brace-expansion` ≥5.0.12; upload error
+  paths unlink orphaned multer disk files.
+- Hardened dynamic SQL table identifiers via `assertSafeSqlIdent` (stats,
+  dump/restore).
+- Go JWT now emits and requires `aud`/`iss`/`nbf` (issuer `betterdesk-server`,
+  audience `betterdesk-api`). **Operators must re-login** after upgrade —
+  tokens without these claims are rejected.
+- CSP: removed `script-src-attr 'unsafe-inline'` and default `/remote`
+  `unsafe-eval` (RdClient uses a static protobuf bundle). Emergency rollback:
+  `CSP_RELAX_REMOTE=true`. Inline `onclick`/`onchange` migrated to
+  `data-bd-call` + `bd-actions.js`.
+- Security Test Suite bumped to v1.2.0 (`npm run test:security` /
+  `scripts/run-security-suite.*`).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.161] — 2026-10-17
+
+### Changed
+- Moved personal TOTP management to the Authentication settings tab while
+  keeping it available to users without the `server.config` permission.
+- Fixed language-picker metadata that displayed English for multiple locales,
+  including French and Traditional Chinese.
+- Added scheduled, validated full-instance backups with retention, local or
+  mounted-network destinations, SHA-256 sidecars, destination tests and SMB
+  connection validation.
+
+---
+
+## [3.5.160] — 2026-10-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.159] — 2026-10-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.158] — 2026-10-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.157] — 2026-10-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.156] — 2026-10-12
+
+### Changed
+- **OIDC SSO-first login and role administration (#443):** OIDC can now launch
+  SSO automatically, while `/login?autoLaunch=0` and private network access
+  retain the local password form for recovery. Administrators can change roles
+  for OIDC users; the selected role persists unless an explicit OIDC group-role
+  mapping matches on a later login. Password changes remain provider-managed.
+
+---
+
+## [3.5.155] — 2026-10-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.154] — 2026-10-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.153] — 2026-10-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.152] — 2026-10-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.151] — 2026-10-06
+
+### Changed
+- **Relay hairpin identity hydration:** when an online peer is restored from the database before its `RegisterPk` handshake, UDP/TCP relay and `RelayResponse` forwarding now reload the persisted public key instead of emitting an unsigned `signedPk=0` response. Shared-public-IP sessions continue to use the public relay path for issue #121.
+
+---
+
+## [3.5.150] — 2026-10-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.149] — 2026-10-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.148] — 2026-10-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.147] — 2026-10-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.146] — 2026-10-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.145] — 2026-10-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.144] — 2026-10-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.143] — 2026-10-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.142] — 2026-10-01
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.141] — 2026-10-01
+
+### Changed
+- **Docker split-entrypoint startup:** load the shared path helpers before
+  server and console checks, removing the `file_exists_as_betterdesk: not found`
+  error reported on 3.5.140 (Refs #437).
+
+---
+
+## [3.5.140] — 2026-09-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.139] — 2026-09-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.138] — 2026-09-26
+
+### Changed
+- **Hardened Docker startup on app-owned bind mounts (#424):** All-in-one and split entrypoints now inspect data files as the `betterdesk` user, so existing `.api_key`, `.admin_credentials`, SQLite databases, and enrollment markers are not mistaken for missing files when `cap_drop: ALL` is used with `0700` bind mounts. Bootstrap also always exports the admin variables required by supervisord, without generating replacement credentials for an existing database.
+
+---
+
+## [3.5.137] — 2026-09-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.136] — 2026-09-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.135] — 2026-09-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.134] — 2026-09-25
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.133] — 2026-09-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.132] — 2026-09-24
+
+### Changed
+- **Split Docker connection strategy (#432):** Settings → Connection strategy is now writable in the legacy split Docker layout. The Go server persists the validated P2P/relay and initiator policy in the shared `server_config` database and applies it live; environment values remain the bootstrap fallback when no panel value exists. Native systemd/compose deployments keep their existing persistence and restart flow.
+- **PostgreSQL installer authentication:** Native local PostgreSQL setup now adds idempotent, loopback-only `pg_hba.conf` rules for the BetterDesk role and database before testing the TCP/password connection, fixing fresh Rocky Linux/RHEL-compatible installations.
+
+---
+
+## [3.5.131] — 2026-09-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.130] — 2026-09-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.129] — 2026-09-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.128] — 2026-09-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.127] — 2026-09-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.126] — 2026-09-22
+
+### Added
+- Operators can switch a BetterDesk Desktop client between normal and incoming-only from device details. The command is queued per device and delivered only inside the signed telemetry envelope.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.125] — 2026-09-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.124] — 2026-09-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.123] — 2026-09-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.122] — 2026-09-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.121] — 2026-09-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.120] — 2026-09-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.119] — 2026-09-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.118] — 2026-09-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.117] — 2026-09-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.116] — 2026-09-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.115] — 2026-09-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.114] — 2026-09-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.113] — 2026-09-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.112] — 2026-09-18
+
+### Changed
+- **Controller-only RustDesk compatibility:** added the opt-in
+  `ALLOW_LEGACY_OUTBOUND=Y` path for stock mobile/desktop clients that do not
+  register a local device before starting an outbound session. It is limited to
+  `ENROLLMENT_MODE=open`, forces relay with the normal one-use ticket, and
+  remains disabled by default. Design and implementation adapted from
+  [@remoover's PR #358](https://github.com/UNITRONIX/BetterDesk/pull/358).
+  Refs #427.
+
+---
+
+## [3.5.111] — 2026-09-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.110] — 2026-09-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.109] — 2026-09-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.108] — 2026-09-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.107] — 2026-09-17
+
+### Changed
+- **Transport and enrollment hardening:** mixed WebSocket/native relay framing
+  is handled through a bounded, authenticated message bridge; connected peer
+  ID renames preserve live registrations; and explicit `ENROLLMENT_MODE`
+  configuration is reconciled safely with panel state. The framing and
+  compatibility review is documented in
+  [PR #346](https://github.com/UNITRONIX/BetterDesk/issues/346).
+- **Web Remote file transfer:** the dedicated file-transfer runtime is loaded
+  only when needed, waits for the relay session before browsing, and tolerates
+  older input implementations without optional controls.
+  Thanks to [@remoover](https://github.com/remoover) for the production
+  reports, test cases, and reviewable designs in [#282](https://github.com/UNITRONIX/BetterDesk/pull/282),
+  [#348](https://github.com/UNITRONIX/BetterDesk/pull/348), and
+  [#357](https://github.com/UNITRONIX/BetterDesk/pull/357). See the
+  [contributor attribution register](docs/development/CONTRIBUTOR-ATTRIBUTIONS.md).
+
+---
+
+## [3.5.106] — 2026-09-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.105] — 2026-09-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.104] — 2026-09-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.103] — 2026-09-16
+
+### Changed
+- **Docker image build sources:** Console and all-in-one images no longer copy the withdrawn `betterdesk-agent` / `betterdesk-support-agent` trees. Client Generator builds use the BetterDesk-Client templates shipped through the console data module.
+
+### Fixed
+- **Docker admin bootstrap database alignment (#385):** Split Compose variants now explicitly point Go and Node.js at the shared `/opt/rustdesk/db_v2.sqlite3` database, preventing credentials-file and panel-auth state from diverging.
+
+---
+
+## [3.5.102] — 2026-09-16
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.101] — 2026-09-15
+
+### Changed
+- **Account-bound stock-client initiation (#414):** Added the opt-in `LOGGED_IN_ONLY_INITIATOR=Y` / **Settings → Connection → Require client login for initiators** setting. Stock RustDesk clients must present an active BetterDesk client-session token before starting PunchHole/relay connections; address, TCP-session, UDP-port, IP, and shared-NAT fallbacks are rejected in this mode. Panel Web Remote remains available through its own authentication, and target passwords/approvals remain required. Disabled by default. Ships via panel update; restart the BetterDesk Go server after enabling.
+- **Operator-only stock-client initiation (#425):** Added the opt-in `OPERATOR_ONLY_OUTBOUND=Y` / **Settings → Connection → Allow Admin/Operator outbound sessions only** setting. Stock RustDesk clients now need an active BetterDesk session with `device.connect` permission; approved endpoints and downgraded/viewer/pro sessions cannot initiate new PunchHole/relay connections. Each attempt is rechecked and recorded as allowed or denied in the signal audit log. Panel Web Remote remains available through its authenticated path. Disabled by default. Ships via panel update; restart the BetterDesk Go server after enabling.
+- **UX 3.5 default shell:** UX 3.5 is now the only supported console shell for existing and new users; the classic shell, shell switch, and beta indicators are removed. Legacy `bd_ui_shell=classic` cookies and `?ui=classic` links are mapped to UX 3.5.
+- **Settings read rate limit:** Allowlisted authenticated Settings reads now use `PANEL_READ_RATE_LIMIT_MAX` (default `600`/minute) instead of consuming the general `RATE_LIMIT_MAX` budget. Login, mutation, upload, backup, update-action, and public/API limits remain unchanged.
+- **Client onboarding:** The dashboard now presents a short generator → QR/copy configuration → registration workflow using the existing Client Generator and server configuration tools.
+
+### Fixed
+- **Appearance profile duplication (#424):** After duplicating a profile, the new copy is selected so subsequent edits are saved to the copy rather than unexpectedly overwriting the active profile.
+- **Notification badge at zero (#424):** Added a UX 3.5 regression contract ensuring the red unread badge remains hidden when there are no unread notifications.
+
+---
+
+## [3.5.100] — 2026-09-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.99] — 2026-09-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.98] — 2026-09-13
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.97] — 2026-09-13
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.96] — 2026-09-13
+
+### Fixed
+- **UX 3.5 light theme topbar:** topbar chrome (background, brand text, icons, hover) now follows light/dark theme instead of staying dark-only; notification badge hides at 0; theme toggle is atomic with target sun/moon semantics.
+- **A11y / i18n shell polish:** decorative Material Icons use `aria-hidden`; language allowlist drops stray `PACKAGE` entries; Help/MeshCentral strings localized; dashboard breadcrumb no longer duplicates “Panel”; attention metrics and activity feed aligned with real data; sidebar filter + collapsible sections; mutual close for topbar popovers; remote desk usable at short laptop heights (~1280×720).
+- **Theme audit noise:** quick light/dark toggle logs as `theme_toggle` instead of `branding_update`; audit action labels localized via `Utils.formatAuditAction`.
+
+### Changed
+- **Stop tracking legacy desktop/agent trees:** `betterdesk-agent`, `betterdesk-agent-client`, `betterdesk-desktop`, and `rdclient-desktop` (and local `*_old` renames) are removed from git and ignored — they are not part of the panel update path.
+
+---
+
+## [3.5.95] — 2026-09-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.94] — 2026-09-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.93] — 2026-09-11
+
+### Fixed
+- **Leftover generator download pages hidden (#412):** After the Support Generator migration, older download pages stayed in the database and remained reachable at `/d/:slug`, but they disappeared from the Generator list so they could not be deleted and the name stayed reserved. The panel now lists leftover pages (including when the ALPHA module is not installed) with revoke/delete only. Ships via panel update. Verify: Generator shows previous pages with a Legacy badge; Delete frees the slug; a new bundle can reuse the name.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.92] — 2026-09-09
+
+### Fixed
+- **RdClient web — PunchHoleResponse #405 / connection policy parity:** honor explicit `Failure=OFFLINE|LICENSE_*` even when `relay_server` is set (proto3 default `failure=0` previously let `hasRelay` win). Inject Go `/api/health` `connection` snapshot into `/remote/:id` viewer; size rendezvous/RelayResponse waits from `p2p_fallback_ms`; keep browser `force_relay=true`; advertise `BetterDesk-Web/1.4.9`. Ships via panel update.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.91] — 2026-09-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.90] — 2026-09-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.89] — 2026-09-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.88] — 2026-09-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.87] — 2026-09-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.86] — 2026-09-06
+
+### Fixed
+- **Devices mobile taps blocked (#410):** Sticky folders/groups/strategies no longer cover the device list on phones; kebab backdrop closes on tap and only opens at ≤600px; row HTML5 drag is off on touch/mobile shell; single-tap opens device detail; floating horizontal scrollbar is hidden on touch + mobile-shell (Desktop site). Verify: phone Chrome classic + UX 3.5 → sync/filters/kebab/row detail respond; open/close kebab without a dead full-screen overlay.
+- **OIDC discovery retry after boot (#411):** When auto-discovery fails because the IdP is unreachable at Go API start, discovery is retried every 2 minutes until it succeeds (no manual OIDC Save/restart required). Verify: start BetterDesk with IdP down → SSO fails; bring IdP up without restarting → within ~2 minutes logs show `Discovery OK` and SSO login works.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.85] — 2026-09-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.84] — 2026-09-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.83] — 2026-09-06
+
+### Fixed
+- **Enrollment approve display name:** Approving a pending device with a custom name now writes `peers.display_name` (not only `note` / config), so the Devices list shows the operator-assigned name instead of the machine hostname.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.82] — 2026-09-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.81] — 2026-09-05
+
+### Fixed
+- **Docker admin bootstrap clarity (#385 follow-up):** Compose files map `ADMIN_PASSWORD=${ADMIN_PASSWORD:-}` into the container (not only `INIT_ADMIN_*` / `DEFAULT_ADMIN_*`). Bootstrap logs `set=yes|no` without printing the password. Docs note AIO `:dev` is amd64-only — ARM hosts should use split compose, local AIO build, or multi-arch tip tag `dev-arm`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.80] — 2026-09-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.79] — 2026-09-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.78] — 2026-09-05
+
+### Fixed
+- **PunchHole empty `socket_addr` → `OFFLINE` (#405):** success-shaped `PunchHoleResponse` paths that still cannot encode a compatibility address now set `Failure: OFFLINE` instead of leaving `failure` unset (proto3 zero = `ID_NOT_EXIST` on stock clients). WS-only peers with a parseable address still use `encodePeerSocketAddr` as before.
+- **LAN detection ignores `MASK` / `-mask` (#404):** `isSameNetwork` and LAN-relay reachability used a hardcoded IPv4 `/24` octet compare while `MASK` was loaded but never read. Configured CIDR (e.g. `192.168.0.0/16`) now drives both checks; empty/invalid `MASK` keeps the historic `/24` fallback. Ships via Go signal restart / panel update. Verify: set `MASK=192.168.0.0/16`, connect peers on `192.168.1.x` and `192.168.2.x`, expect `is_local` / `[LAN] … same MASK network` in signal logs.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.77] — 2026-09-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.76] — 2026-09-05
+
+### Fixed
+- **Web Remote → WebSocket Mode relay pairing (#397 follow-up, #403):** hbbr now bridges mixed TCP (`:21117`) ↔ WS (`:21119`) sessions with BytesCodec↔message translation (16 MiB peer-frame cap), so panel Web Remote can complete relay to WS-mode peers. Signal exemption for `panel-web-remote` alone was insufficient — pairing previously failed with `Protocol mismatch … tcp <-> ws`. Ships via Go relay restart / panel update.
+- **Settings mobile topbar + tab chrome (#396 follow-up):** UX 3.5 menu/logo icons are vertically centered in the topbar; Settings tab track drops extra bottom padding and phone viewports tighten the page-header→tabs gap (sticky bleed unchanged). Ships via panel update. Verify: ≤767px UX 3.5 → hamburger/logo aligned in the 48px topbar; Settings tabs compact with no empty strip under the underline; scroll still keeps tabs flush under the content top.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.75] — 2026-09-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.74] — 2026-09-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.73] — 2026-09-03
+
+### Fixed
+- **GHCR `:dev` product version lag behind git tip (#401):** `docker-publish.yml` built images from the feature commit (VERSION N) then skipped the following `[version-bump]` commit (N+1), so pulled `:dev` images showed a stale semver. Branch pushes now publish only on version-bump subjects, and `version-bump-dev` dispatches docker-publish with `tag=dev` after each bump (GITHUB_TOKEN pushes do not re-trigger workflows). All-in-one `:dev` builds use `linux/amd64` only (multi-arch AIO was hitting the 6h Actions limit and cancelling); console/server stay multi-arch.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.72] — 2026-09-03
+
+### Fixed
+- **Shared-NAT / CGNAT connection gaps after 3.5.4 (#399 follow-up):** RelayResponse forwarding now resolves initiator/target from the pending relay store (UUID + endpoint) and panel signal-proxy CIDRs, and no longer delivers relay tickets via bare `FindByIP` on multi-device NATs. Opt-in `ALLOW_SHARED_NAT_INITIATOR` / Settings checkbox authorizes stock clients behind shared public IPs as synthetic `shared-nat-initiator` (default off; does not inherit peer identity / #302). Startup warns when `SAME_NAT_RELAY` is disabled while several live peers share one public IP. Ships via panel update (Go signal restart); enable the flag only for multi-device CGNAT/office sites that cannot use account login.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.71] — 2026-09-03
+
+### Fixed
+- **CGNAT / multi-device same public IP punch auth (#399):** PunchHole now correlates `udp_port` to the initiator's registered NAT-mapped UDP endpoint when several peers share one public IP, and opaque login tokens are matched case-insensitively. Does not restore insecure IP-only identity inheritance (#302). Ships via Go signal restart / panel update.
+- **Web Remote → WebSocket Mode targets (#397):** Panel Web Remote (`panel-web-remote` / loopback proxy) is exempt from the TCP↔WS signal protocol mismatch gate so browser sessions can negotiate relay to WS-mode clients. Full pairing also needs the hbbr BytesCodec↔WS bridge (see Unreleased / later patch).
+- **Docker Support Agent generator missing source (#391):** AIO and console images copy `betterdesk-support-agent` / `betterdesk-agent` (and symlink under `/opt/BetterDeskConsole/agent-source`) so Client Builds no longer fail with `ENOENT` on `agent-source`.
+- **Docker admin credentials file when `ADMIN_PASSWORD` is set (#385):** Bootstrap still writes `/opt/rustdesk/.admin_credentials` on a fresh volume so `betterdesk-show-admin-credentials` matches panel login. Split-volume guard error text now recommends `SQLITE_AUTH_DB_MODE=legacy` before suggesting a wipe.
+- **Native install Go module hang (#371 follow-up):** Module download no longer uses fragile setsid/pidfile waiters; IPv6 stay-disabled wraps a verified `go list -m all`, with `GODEBUG=netdns=go` during the download.
+- **Material Symbols without Google Fonts CDN (#393):** Console self-hosts Material Symbols Outlined/Rounded subsets under `/fonts/` (replacing Classic Material Icons that lacked ligatures such as `monitoring`). Viewer / remote-desk / login / agent-download / widget popouts no longer load `fonts.googleapis.com/icon`. Refresh subsets with `node scripts/update-material-symbols.mjs` (maintainer-only; not panel runtime).
+- **Settings mobile tab bar density (#396 follow-up):** UX 3.5 settings tabs use tighter padding and vertically centered 18px icons below 767px.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.70] — 2026-08-30
+
+### Fixed
+- **Settings tab bar sticky + mobile (#396):** Settings horizontal tabs stay flush under the top of the content scroll area (bleed cancels content padding), keep sticky on narrow/mobile instead of scrolling away, and scroll the active tab into view when switching or opening a hash link. Ships via panel update. Verify: Settings → scroll a long form → tab bar flush at top; ≤900px / mobile → tabs remain visible while scrolling; `/settings#updates` brings Updates into the horizontal track.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.69] — 2026-08-29
+
+### Added
+- **Custom download portal product label (#386):** Agent Generator advanced branding can override or hide the product type line (`download.product_*`) on the public download page without rebuilding installers.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.68] — 2026-08-29
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.67] — 2026-08-29
+
+### Fixed
+- **GHCR `:latest` stuck on 3.5.4 while #382 lived only on `:dev` (#387):** `docker-publish.yml` skipped image builds for `[version-bump]` tag pushes, never moved `latest` on Release, and `workflow_dispatch` with default `latest` published no tags. Stable releases now always build, retag `latest` (non-prerelease), and manual dispatch publishes `latest` + current `VERSION`. Prefer pinning compose/`install.sh` semver for production.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.66] — 2026-08-25
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.65] — 2026-08-25
+
+### Changed
+- **Docker admin login bootstrap race (#385):** Split Docker entrypoints now atomically create and share one bootstrap password, including when `.admin_credentials` is mode `0600`. Fresh SQLite authentication remains centralized in `db_v2.sqlite3`; legacy `auth.db` is no longer treated as the default panel store. The Docker startup wait now only applies to explicitly selected legacy mode.
+
+### Fixed
+- **Docker split-volume stale auth.db (#385):** Entrypoints now detect partial volume wipes (legacy `auth.db` in `/app/data` while `/opt/rustdesk` was reset) and fail fast with a clear error, or remove an empty orphan `auth.db` so fresh installs stay on consolidated `db_v2.sqlite3`.
+
+---
+
+## [3.5.64] — 2026-08-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.63] — 2026-08-24
+
+### Fixed
+- **User save crash when assigning strategy (#384):** `setUserStrategyAssignment` called missing `ensureUserGuid` in `dbAdapter.js`, causing `TypeError` and generic "Server error" on every user create/update. Ships via panel update.
+- **Docker admin login vs credentials file (#385):** Fresh Docker installs without `ADMIN_PASSWORD` could generate two different random passwords — Go wrote `/opt/rustdesk/.admin_credentials` while the web panel authenticated against `auth.db` seeded by Node.js. Entrypoints now pre-bootstrap a shared password before either service starts; `readAdminCredentialsFile()` prefers `/opt/rustdesk`. Rebuild/pull `:dev` images or use `ADMIN_PASSWORD` on first start.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.62] — 2026-08-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.61] — 2026-08-23
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.60] — 2026-08-23
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.59] — 2026-08-23
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.58] — 2026-08-23
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.57] — 2026-08-23
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.56] — 2026-08-23
+
+### Fixed
+- **Relay pair timeout when the target is `connType=tcp` but still heartbeats on UDP (#382):** TCP `RegisterPk` (logged-in GUI) stamped `ConnTCP` and later UDP heartbeats did not restore `ConnUDP`. PunchHole/RequestRelay then called `sendToPeer`, which ignored `UDPAddr` and dropped the message (`TCPConn` is never set). The initiator connected to relay; the target never did. Delivery now prefers UDP when `UDPAddr` is set, heartbeats restore `ConnUDP` (without overriding WebSocket), and `"forwarded"` is logged only when a transport accepted the message. Ships via panel update (Go signal restart). Verify: WAN session to a logged-in native target reaches `[relay] Pair established`; server log shows PunchHole/RequestRelay forwarded; no `Pair timeout` for that UUID.
+- **Registration notifications in UX 3.5:** Pending LAN and managed enrollment requests now update the global badge, appear in the topbar notification center, and refresh the registrations page without opening the tab. The panel event stream has a polling fallback and remains restricted to users with `enrollment.approve`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.55] — 2026-08-21
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.54] — 2026-08-21
+
+### Fixed
+- **Native install Go module hang on broken-IPv6 VMs (#371 follow-up):** Preflight now probes IPv4/IPv6 separately, temporarily disables IPv6 when AAAA is unreachable, forces `GOTOOLCHAIN=local` (override via `BETTERDESK_GOTOOLCHAIN`), GETs a sample module from `proxy.golang.org`, and bounds `go mod download` with a setsid process-group watchdog (heartbeat + hard TERM/KILL) instead of relying on GNU `timeout` alone.
+- **Peer grant / strategy scope no longer fail silently (#380 follow-up):** `POST`/`PATCH` `/api/users` reject with `500` *before* writing the user when peer-grant or strategy-assignment DB methods are missing (instead of `{success:true}` with empty grants). `PATCH` responses include refreshed `peer_grants` / `folder_ids` / `strategy_guid`. Unknown device IDs in `peerIds` are logged as warnings only. Facade parity tests cover required `database.js` exports. Ships via panel update.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.53] — 2026-08-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.52] — 2026-08-20
+
+### Fixed
+- **Per-user device grants (`peerIds`) silently no-op (#380):** `POST`/`PATCH` `/api/users` accepted `peerIds` and returned success, but never wrote `user_peer_grants` because `getUserPeerGrants` / `setUserPeerGrants` (and strategy assignment helpers) were missing from the `database.js` facade. Ships via panel update.
+
+### Changed
+- **Native BetterDesk Desktop foundation:** Added the independent Rust core and Flutter operator shell with CDAP/RustDesk session paths, tray/background UX, administrator-only machine settings, Windows/Linux packaging (`build.py`), and release workflow artifacts (EXE/MSI/portable + DEB/RPM/AppImage/tar.gz). Version bump now includes desktop Cargo/Flutter manifests.
+- **CDAP desktop interop:** Documented protocol 0.4.0 (`register` / `auth_result` / binary desktop frames), added `view_only` on desktop start, `desktop_end` stop type, and expanded capability allowlist (`keyboard_input`, `mouse_input`, `multi_monitor`, `unattended_access`).
+- **WAN allowlist for desktop bootstrap:** Public console WAN paths now include `GET /api/health` and `GET /api/server/pubkey` so Desktop can probe and fetch the server key without a session cookie.
+
+---
+
+## [3.5.51] — 2026-08-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.50] — 2026-08-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.49] — 2026-08-19
+
+### Fixed
+- **Console SIGABRT on Node.js 24 (#377):** Production Docker console images now use pinned Node.js `22.23.2` while the Node.js 24 cleanup-hook backport is released and validated. `better-sqlite3` remains on 13.x; no statement-lifecycle refactor is required. Ships via the next AIO or split console image.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.48] — 2026-08-19
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.47] — 2026-08-17
+
+### Fixed
+- **Config QR UX for unreachable hosts (#368):** Dashboard and Keys QR modals warn when the embedded host is `localhost` / loopback / `.local`. Keys QR and server-info now honour the same Dashboard `Client server address` session override (`?host=`). Ships via panel update.
+
+### Added
+- **Docker PUID/PGID (#376):** Optional `PUID`/`PGID` env vars (default `10001`) remap the `betterdesk` user at container start so Synology/NAS bind mounts match host ownership without Compose `user:` overrides. Ships via new GHCR image / `docker compose pull` (AIO + split). Set in compose or `.env`, then recreate containers.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.46] — 2026-08-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.45] — 2026-08-16
+
+### Fixed
+- **Native install Go module download hang (#371):** Module download now probes `proxy.golang.org` / `sum.golang.org` before fetching, prints a working 15s heartbeat, and enforces a hard deadline with `timeout -k` (bash TERM/KILL fallback) so stalled cloud VMs fail with a clear error instead of sitting past the advertised timeout.
+- **Managed enrollment for viewer-only mobile (#375):** Clients that only log in and initiate sessions (no `RegisterPeer`/`RegisterPk`) now appear in `/registrations` when `ENROLLMENT_MODE=managed` — queued from successful `/api/login` and from PunchHole rejected with a valid account login token. Connection stays denied until operator approval. Locked mode still does not queue. Stock client “ID does not exist” for this case means the initiator is not enrolled, not a missing target.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.44] — 2026-08-16
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.43] — 2026-08-15
+
+### Fixed
+- **Native installer used `main` when curling `/dev/install.sh` (#371):** `install.sh` on the Development channel now defaults to branch `dev`, prints the cloned commit SHA, and switches an existing `/opt/betterdesk/source` clone onto that branch. Module download also prints Go/GOPROXY diagnostics, keeps a 15s heartbeat, and prefers `GOTOOLCHAIN=local` so the step cannot hang silently while auto-fetching another toolchain.
+- **Support Agent generator builds (Linux + Windows):** Windows MSI/portable no longer fail when `winicon` ran against sealed `BDBR1` branding (`invalid character 'B'`). Linux `.deb` / `.rpm` / AppImage / tar.gz packaging now expects the default Wails single binary instead of missing X11/Wayland companions (`ENOENT` under `data/build-cache`). Fyne dual layout remains when those binaries are present. Ships via panel update (`agentBuildWorker.js` + agent-source `build.sh`); retry Client Builds after update. Refs #373.
+
+---
+
+## [3.5.42] — 2026-08-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.41] — 2026-08-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.40] — 2026-08-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.39] — 2026-08-15
+
+### Changed
+- **Installer lifecycle reliability:** Native Linux/Windows updates now
+  verify tracked commits, preserve rollback state and perform safer
+  preflight/health checks; Windows agent installation can fall back to a
+  scheduled task when NSSM is unavailable.
+- **Cross-platform installer verification:** Added shared protocol checks,
+  installer-focused unit tests, Docker smoke validation and static CI gates
+  for Bash, PowerShell and Compose paths.
+- **Agent uninstall safety:** Native agent uninstall now preserves config and
+  enrollment data by default; explicit purge flags are required for cleanup,
+  including the support-agent binary's persistent state.
+
+---
+
+## [3.5.38] — 2026-08-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.37] — 2026-08-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.36] — 2026-08-15
+
+### Changed
+- **Native Linux installer Go download diagnostics (#371):** Native builds now use the Go `1.26.5` toolchain pinned by the server module, show module download progress, and fail with a timeout plus network guidance instead of appearing stuck at `Downloading Go modules...`. The panel rebuild path uses the same pinned toolchain.
+
+---
+
+## [3.5.35] — 2026-08-14
+
+### Fixed
+- **RustDesk client config QR encoding (#368):** Dashboard / Keys QR and `config_uri` now embed the same reversed deploy string as **Copy deploy string** / Import Server Config (`rustdesk://config/<reversed-b64>`). Stock clients rejected the previous standard-base64 path as invalid. Ships via panel update. Verify: QR path equals deploy string; desktop Import works; on Android/iOS 1.4.9+ enable built-in `allow-deep-link-server-settings` or use Import fallback.
+- **MFA enrollment QR compatibility:** TOTP setup now uses issuer `BetterDesk` (no spaces), a 20-byte secret, and a Go-aligned `otpauth://` URI without `algorithm=`. Some apps (e.g. Microsoft Authenticator on iOS) reject issuer labels with spaces as an invalid QR. Ships via panel update. Verify: Settings → Enable 2FA → scan with Google/Microsoft Authenticator; confirm code enables 2FA.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.34] — 2026-08-10
+
+### Fixed
+- **Enrollment sidebar pending badge (#351):** `GET /api/registrations/count` now sums LAN discovery pendings and Go managed enrollment queue, so the sidebar badge stays visible on Dashboard/Devices/etc., not only on Enrollment Requests.
+- **Legacy rejected IP display (#351):** Orphan `rejected_device_*` history rows backfill IP from `peers` when available (and persist it); pure legacy locks without a peer row still show `—` (IP was never stored).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.33] — 2026-08-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.32] — 2026-08-10
+
+### Added
+- **Org peer credential vault (#367):** Organizations → Address Book can Set/Clear a per-contact unattended preset. Secrets are AES-256-GCM encrypted in the main DB (`org_peer_credentials`, SQLite/PostgreSQL), never stored in shared AB JSON. Runtime inject into `GET /api/ab` (`password` field) for authorized members; Web Remote pre-fills via `/api/devices/:id/connect-password`. Prefer `ORG_PEER_VAULT_KEY` (falls back to JWT secret). Ships via panel update (Go API restart). Verify: set password on org contact → RustDesk AB / Web Remote can connect without typing the secret; Advanced JSON dump has no password/hash.
+
+### Changed
+- **Settings horizontal top tabs (#362):** Console Settings sub-navigation is a full-width horizontal tab bar (underline style, like Organizations) instead of a vertical left sidebar, so forms use the full content width. Ships via panel update. Verify: Settings → tabs sit under the page header; laptop/mobile can scroll tabs horizontally; hash links (`#auth`, `#updates`) and search still work.
+
+---
+
+## [3.5.31] — 2026-08-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.30] — 2026-08-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.29] — 2026-08-09
+
+### Added
+- **Support Agent Wails UI:** Default GUI is Wails (WebView2 / WebKit) with branded HTML shell; Fyne remains behind `fyneui` / `BETTERDESK_SUPPORT_FYNEUI=1`. Ships via rebuilt Support Agent (agent-source). Verify: window shows device ID / password without Mesa OpenGL DLL crashes.
+- **Support Agent multi-codec remote desktop:** `signalhost` negotiates RustDesk PreferCodec (Auto / VP8 / VP9 / AV1 / H264 / H265), probes HW encoders (NVENC/QSV/AMF/…), prefers Windows `ddagrab` then `gdigrab`. Ships via rebuilt Support Agent. Verify: RdClient codec menu switches encoder; Task Manager shows GPU encode when available.
+
+### Fixed
+- **Support Agent Windows console cascade:** Without a quiet capture path, PeerInfo / screenshot fallback spawned a visible PowerShell window per frame (and ffmpeg without `CREATE_NO_WINDOW`). Desktop capture on Windows now uses GDI→JPEG; helper `exec` calls hide the console. Ships via rebuilt Support Agent (agent-source). Verify: start agent + open a session — no flood of cmd/PowerShell windows.
+- **Support Agent Windows builds (sealbranding + mingw CC):** `build.sh` no longer exports mingw `CC`/`CXX` before `go run ./cmd/sealbranding`. Seal runs with `CGO_ENABLED=0`; mingw is applied only around the final Windows `go build`. This was mis-reported in the UI as “CGO / mingw required” while mingw was already installed. Ships via panel update (agent-source `build.sh` + `agentBuildWorker.js`).
+- **Support Agent AppImage as `betterdesk` user:** install toolchain now extracts `appimagetool` to `/usr/local/lib/appimagetool` with a shell wrapper (no FUSE / no write next to `/usr/local/bin`). Worker packs with writable `HOME`/`TMPDIR` under the build cache. Re-run `scripts/install-build-toolchain.sh` (or menu **B**) on hosts that still have the raw AppImage binary.
+- **Support Agent Windows crash `0xC0000135` / missing DLL:** Generator shipped incomplete Mesa `opengl32.dll` without `libgallium_wgl.dll`, which shadowed system OpenGL and blocked startup. Fetch/pack/embed now require the full DLL pair (or skip Mesa entirely). Agents already installed: delete `opengl32.dll` next to the exe if `libgallium_wgl.dll` is missing.
+
+### Changed
+- **Generator — Support Agent only:** primary CTA is New Support Agent; Agent Client / RdClient create buttons hidden. Defaults to `support-agent`. Optional branding is collapsed; build-platform checkboxes control which installers are queued. Toolchain banner probes mingw + appimagetool; branding-seal errors are classified correctly.
+
+---
+
+## [3.5.28] — 2026-08-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.27] — 2026-08-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.26] — 2026-08-09
+
+### Fixed
+- **Attestation Light theme contrast (#363):** Tier guide descriptions use `--text-primary`; IRON/TITANIUM/OBSIDIAN badge gradients stay readable on the dark chip; attestation cards use `--bg-secondary` (undefined `--bg-surface` removed). Ships via panel update (`server-attestation.css`). Verify: Light theme → Server Attestation → “What does each tier mean?” text and IRON/TITANIUM/OBSIDIAN badges are readable.
+- **Fleet org filter 404 (#364):** Fleet Management called non-existent `GET /api/panel/organizations`; it now uses `GET /api/panel/org` (same as Policies). Ships via panel update (`fleet.js`). Verify: Fleet page Network tab shows `/api/panel/org` (no 404), org dropdowns populate.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.25] — 2026-08-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.24] — 2026-08-07
+
+### Added
+- **RdClient desktop — native Cliprdr + folder file transfer stack (Refs #350):** recovered onto current `dev` from divergent history — Tauri `desktop_*` / `desktop_clipboard_*` IPC, `cliprdr.js`, desktop DnD, streamed folder upload/download. Requires rebuilt `rdclient-desktop` **and** panel update.
+
+### Fixed
+- **Outbound “ID does not exist” after 3.5.16 (#302 residual):** stock RustDesk PunchHole/RequestRelay on a new TCP port (no login token, no shared RegisterPk session) was rejected as `initiator_not_registered` because 3.5.16 removed the safe `FindAllByIP` fallback restored in 3.5.15. Auth again authorizes when exactly one live peer shares the public IP; multiple live peers at that IP still refuse with `initiator_ambiguous_same_nat` (no identity inheritance). Ships via panel update (Go signal restart). Verify: stock client connect no longer shows “ID does not exist” when the initiator is the sole live peer at its public IP.
+- **Relay `Unauthorized relay UUID` after P2P fallback (#356):** when hole punch timed out and the target sent `RelayResponse`, signal forwarded the UUID without minting a relay ticket, so hbbr rejected both peers (`Reset by the peer(0)`). `handleRelayResponseForward` now authorizes the initiator/target pair before advertising the UUID (same ticket path as `RequestRelay`). Ships via panel update (Go signal/relay restart). Verify: connection that needs relay after P2P timeout succeeds; no `[relay] Unauthorized relay UUID` for that session.
+- **RdClient desktop — Copy-Paste / File Transfer creates 0KB empty remote files (#350):** Tauri IPC returns file chunks as base64 strings; JS treated them as `Uint8Array` constructors (`new Uint8Array(base64String)`), which always yields length 0, so Cliprdr and the File Transfer modal wrote empty remote files. `coerceBinaryPayload` now decodes base64 before upload/Cliprdr paths. Ships via panel update (`local-files.js` / `filetransfer.js` / `cliprdr.js` / `compress.js` / `protocol.js`).
+- **RdClient desktop — Cliprdr paste still 0KB after base64 coerce (#350):** outbound FILEGROUPDESCRIPTOR advertised `FD_FILESIZE` plus Windows `FD_CREATETIME` (0x08 mistyped as “unix mode”). Remote CliprdrStream trusted a bad/zero stream length and returned EOF without `FILECONTENTS_RANGE`. Descriptors now match RustDesk (`FD_ATTRIBUTES | FD_WRITESTIME | FD_PROGRESSUI`, size via `FILECONTENTS_SIZE` probe); FileContents rejects empty RANGE ACKs and serializes responses. Requires rebuilt `rdclient-desktop` **and** panel update (`cliprdr.js`). Verify: paste/upload a non-empty local file and confirm remote size matches.
+- **Enrollment QA follow-up (#351):** Enrollment Requests **All** filter aggregates pending + approved + rejected Go history. Reject & Ban → **Allow re-enroll** / Unban hard-deletes the enrollment audit peer so managed mode re-queues instead of leaving a zombie or bypassing approval. Orphan legacy `rejected_device_*` locks appear under Rejected. Devices `?search=` is applied on load (View device). Pending metadata can be enriched when HTTP enrollment supplies hostname/platform/version after a signal queue. Copy Device ID on the registrations table. Ships via panel update (Go API/signal restart).
+
+### Changed
+- **Devices drag & drop:** while dragging a device row onto folder/group chips, the panel content (`.main-content` / UX 3.5) auto-scrolls when the pointer nears the top or bottom edge.
+
+---
+
+## [3.5.23] — 2026-08-05
+
+### Fixed
+- **Support Agent rebuild profile gate:** Rebuild / Retry / post-update requeue now re-issues incomplete or expired signed Support Agent profiles (URLs + TTL) before enqueueing builds, so operators are not stuck in a Retry loop that only Save previously fixed.
+- **Support Agent version inject on flat deploys:** Build worker resolves product `VERSION` from the console install root (not `/opt` above a flattened tree) and treats an already-matching `var version` as success, fixing false “version variable not found” failures when the placeholder was still `0.1.0`.
+- **Support Agent `build.sh` branding.pub backup:** Release packaging no longer requires a pre-existing `resources/branding.pub` before `sealbranding` creates it (fresh workspaces failed with `cp: cannot stat 'resources/branding.pub'`).
+- **Console CrashLoop after event-bus connect (#353):** Node.js abort `RemoveEnvironmentCleanupHook` / `(env) != nullptr` was a native N-API lifecycle failure (not Go event-bus init). Console now shares one `better-sqlite3` handle for the main DB (`getDb` / session store / enrollment token lookup), bumps `better-sqlite3` to 13.x for Node 24 Alpine, and defers agent build workers until after listen/WS connect. Ships via panel/Docker console image update.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.22] — 2026-08-05
+
+### Changed
+- Support Agent generator and release profiles allow **HTTP/WS** (LAN/IP) as well as HTTPS/WSS; remote-session encryption remains on the signal/relay protocol layer (RustDesk-style). Uncheck “Use HTTPS / WSS” and re-save the bundle before rebuilding.
+
+---
+
+## [3.5.21] — 2026-08-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.20] — 2026-08-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.19] — 2026-08-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.18] — 2026-08-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.17] — 2026-08-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.16] — 2026-08-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.15] — 2026-08-05
+
+### Security
+- **Dependabot dependency bumps:** `brace-expansion` → 5.0.9 (web-nodejs override), `postcss` → ≥8.5.23 (root + agent-client overrides), `quinn-proto` → 0.11.16 (RdClient Cargo.lock). Dev/build tooling and transitive deps only for postcss/quinn; brace-expansion via panel lockfile.
+- **CDAP file transfer dynamic callback (CodeQL):** validate `request_id` (string + whitelist) and use own-property lookup before invoking pending download callbacks in `cdap-filetransfer.js`. Ships via panel update (static JS).
+
+### Fixed
+- **Outbound “ID does not exist” after 3.5.12 initiator hardening (#302 residual):** stock RustDesk PunchHole/RequestRelay on a new TCP port (no login token, no shared RegisterPk session) was rejected as `initiator_not_registered` because auth required exact `ip:port` only. Restore a safe IP fallback: authorize when exactly one live peer shares the public IP; multiple live peers at that IP still refuse with `initiator_ambiguous_same_nat` (no identity inheritance). Ships via panel update (Go signal restart).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.14] — 2026-08-04
+
+### Fixed
+- **Enrollment history filters & irreversible reject (#351):** Go enrollment Approve/Reject now persists `enrollment_decision_*` history so Enrollment Requests **Approved** / **Rejected** filters show past decisions. Reject & Ban creates a `peers` row when missing so the device appears under Devices → Banned. New **Allow re-enroll** clears `rejected_device_*` (and enrollment bans); Unban also clears the rejection lock. Ships via panel update (Go API restart).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.13] — 2026-08-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.12] — 2026-08-03
+
+### Fixed
+- **Enrollment outbound same-NAT bypass (#302 residual):** PunchHole/RequestRelay initiator auth no longer uses IP-only `FindByIP` (a pending client behind the same public NAT as an approved peer could inherit that peer’s identity with no `Rejected outbound` log). Auth now requires exact `ip:port` (`FindByAddr`), the same TCP session after `RegisterPk`, a BetterDesk client login token, or `PANEL_SIGNAL_PROXY_CIDRS`. Ships via panel update (Go signal restart).
+- **Theme toggle blue flash (#320):** Light ↔ Dark preview briefly set solid hex into `--accent-*-muted` / `--ux35-active-bg`, so Enrollment filter pills, active sidebar item, and user avatar flashed bright blue until branding.css reloaded. Inline preview now uses the same `rgba(..., 0.15)` muted conversion as branding CSS. Ships via panel update.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.11] — 2026-08-03
+
+### Added
+- **Support Agent completion (CDAP path):** Web Remote file transfer, in-session chat, remote audio, lock/restart control relay; Generator toolchain diagnostics + per-platform retry; immediate bundle rebuild after panel updates; last-good CDAP/API endpoint failover; branding seal + optional garble/UPX for release builds; capability flags in bundle branding. Ships via panel update (rebuild Support Agent bundles after update).
+
+### Docs
+- **Support Agent** documented as the active end-user client: [`Desktop-Clients.md`](docs/wiki/Desktop-Clients.md), [`Client-Generator.md`](docs/wiki/Client-Generator.md), [`PROJECT_STRUCTURE.md`](docs/architecture/PROJECT_STRUCTURE.md).
+- **Docker panel HTTPS mismatch (#299):** documented Firefox `SSL_ERROR_RX_RECORD_TOO_LONG` / Chrome `ERR_SSL_PROTOCOL_ERROR` when opening `https://…:5000` against the default HTTP-only GHCR image — [`DOCKER_TROUBLESHOOTING.md`](docs/docker/DOCKER_TROUBLESHOOTING.md), [`DOCKER_QUICKSTART.md`](docs/docker/DOCKER_QUICKSTART.md).
+
+---
+
+## [3.5.10] — 2026-08-03
+
+### Fixed
+- **Enrollment Requests filter contrast (#320):** active status filter buttons used undefined `--primary` with white text, so labels were unreadable in light theme. Active state now uses `--accent-blue` / `--accent-blue-muted` (same pattern as Devices/Tickets). Ships via panel update.
+
+---
+
+## [3.5.9] — 2026-08-01
+
+### Changed
+- **Help panel replaces guided tours:** the console Help control (UX 3.5, classic rail, Desktop Mode) opens a right-side panel with project supporters and GitHub / sponsorship links instead of spotlight tutorials. Tutorial JS/CSS, Settings → Tutorials, and the floating help FAB are removed. Supporters data lives in `web-nodejs/config/supporters.json` (keep in sync with `SPONSORS.md`). Ships via panel update.
+
+---
+
+## [3.5.8] — 2026-08-01
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.7] — 2026-08-01
+
+### Fixed
+- **Native install TLS self-signed deploy regression (#325, discussion #322):** re-applied `_safe_cp_tls_file` no-op when source and dest are the same real file. The v3.4.3 fix was lost on the 3.5.0 merge; fresh `install.sh --native` again failed with `cp: cannot stat '.../betterdesk.crt'`. Symlink→copy for Let's Encrypt (#219) is unchanged. Ships via installer / `betterdesk.sh` (not panel-only). Verify: install completes past “Generating self-signed TLS certificates” with both `/opt/betterdesk/ssl/betterdesk.crt` and `.key` present.
+- **UX 3.5 topbar turned blue / unreadable in light theme:** topbar chrome is now theme-invariant (always dark `#161b22` with light ink). Light/dark still flips sidebar and content. Ships via panel update.
+
+### Changed
+- _(none yet)_
+
+### Docs
+- **Peer password vs BetterDesk login (discussion #285):** clarified that Access Policy / device groups do not bypass the RustDesk peer password — [`Fleet-and-Policies.md`](docs/wiki/Fleet-and-Policies.md), [`SCOPED_REMOTE_USER.md`](docs/features/SCOPED_REMOTE_USER.md), [`RUSTDESK_CLIENT_DEPLOYMENT.md`](docs/setup/RUSTDESK_CLIENT_DEPLOYMENT.md).
+
+---
+
+## [3.5.6] — 2026-08-01
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.5] — 2026-08-01
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.4] — 2026-08-01
+
+### Fixed
+- **Address Book ACL bypass (restricted users) (#342):** `GET /api/ab` (and personal AB / tags) now filters peers and fleet tags through the same device-group / folder ACL as `/api/peers/list`, so org shared address-book merge and stale entries no longer expose out-of-scope machines. Unscoped `GET /api/peers` (without `accessible`/`pageSize`) applies the same ACL for non-admin roles. Ships via panel update (Go server + console).
+- **Legacy SQLite role CHECK blocking Phase 52 sync (#342):** upgraded `users` tables that still had `CHECK (role IN ('admin','operator','viewer'))` are rebuilt on Go `Migrate()` so `super_admin` / `global_admin` / `server_admin` / `pro` sync correctly. Installer/docs creators no longer add the old CHECK. Ships via panel update (Go server restart/migrate).
+- **MeshAgent `.msh` `bad size` (#336):** `GET /api/mesh/download.msh` no longer embeds the static 40-hex MeshID placeholder. Panel/API now emit a stable per-group 96-hex (SHA-384) `MeshID` (optional `mesh_id` query still accepted when 64/96 hex). Ships via panel update (Go restart). Verify: download `.msh` → `MeshID=` is `0x` + 96 hex chars; MeshAgent no longer exits with `bad size`.
+
+---
+
+## [3.5.3] — 2026-08-01
+
+### Fixed
+- **Dashboard Copy deploy string with invalid/placeholder public key (#340):** client config / deploy string / QR now require a valid Ed25519 key (base64 → 32 bytes), reject placeholders, and fall back to the live Go `GET /api/server-key` when `id_ed25519.pub` is missing or bad. Windows installer also sets `PUB_KEY_PATH` in the console NSSM environment. Ships via panel update (re-run `betterdesk.ps1` service setup to refresh NSSM env on Windows).
+
+### Changed
+- **Runtime EOL refresh:** Docker/CI/installers use **Node.js 24 LTS** (`engines` ≥22); Go build images **golang:1.26-alpine**; server runtime **alpine:3.22**. Patch bumps for console (`axios`, `nodemailer`, `ws`, `pg`) and Go modules (incl. `modernc.org/sqlite`). SNMP bridge depends on **`pysnmp` ≥7.1** (replaces `pysnmplib`). See `docs/development/DEPENDENCY_UPGRADE_BACKLOG.md` for deferred Express 5 / native majors.
+
+### Docs
+- Refreshed `docs/architecture/PROJECT_STRUCTURE.md` for the current Go + Node layout; dependency upgrade backlog added.
+
+---
+
+## [3.5.2] — 2026-07-31
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.1] — 2026-07-31
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.5.0] — 2026-07-31
+
+### Added
+- **Optional UX 3.5 console shell (Beta):** full-list sidebar + topbar chrome available via navbar switch (BETA badge) or `?ui=ux35`. **Classic icon rail remains the default and supported production UI.** Docs: `docs/wiki/UX-3.5.md`. Ships via panel update.
+- **FreeBSD (Tier 3 / community):** example `rc.d` scripts and install notes under `contrib/freebsd/`. Refs #310. Manual build only — no CI FreeBSD binaries or panel updater support.
+
+### Changed
+- Dual-mode console chrome: operators who never switch stay on classic; UX 3.5 is explicitly labeled Beta while active (topbar chip). Escape hatch to classic unchanged.
+- Includes prior stable 3.4.1–3.4.3 hotfixes for operators updating from older stables in one step (#302 enrollment outbound hardening, #313 Web Remote panel-proxy, OIDC `user.info`, mesh cert hash, Unban kebab, and related fixes already on `main`).
+
+### Fixed
+- **OIDC client login stuck on "Waiting…" (#304):** panel proxies `GET /api/auth/oidc/callback` (and `/api/oidc/callback`) to the Go API so Redirect URLs on the console origin complete RustDesk SSO. Ships via panel update.
+- **Docker AIO supervisord crash on missing NTP/billing env (#299):** entrypoint/Dockerfile default `NTP_SERVERS` and billing clock vars. Ships via image rebuild / `docker compose pull`.
+- **Rate limiter API path resolution:** more accurate path matching for console API rate limits. Ships via panel update.
+
+### Docs
+- UX 3.5 Beta dual-mode: `docs/wiki/UX-3.5.md`
+- FreeBSD community notes: `contrib/freebsd/`
+
+---
+
+## [3.4.15] — 2026-07-31
+
+### Changed
+- **UX 3.5 labeled Beta (opt-in):** classic console remains the default shell. The navbar switch to UX 3.5 shows a **BETA** badge/tooltip; while UX 3.5 is active a small BETA chip appears in the topbar. Escape hatch back to classic is unchanged. Ships via panel update.
+
+### Fixed
+- _(none yet)_
+
+---
+
+## [3.4.14] — 2026-07-31
+
+### Changed
+- _(none yet)_
+
+### Fixed
+- _(none yet)_
+
+---
+
+## [3.4.3] — 2026-07-30
+
+
+### Changed
+- **Client Configuration public key masked by default (#319):** Dashboard and Keys page show the KEY as bullets until revealed via an eye toggle; Copy still pastes the raw key. Ships via panel update.
+- **Docker update channel (#299):** Settings → Updates cannot switch stable/dev for GHCR image installs; use `BETTERDESK_IMAGE_TAG=latest` or `dev`, then `docker compose pull && up -d`. Panel shows a clear note; API returns `DOCKER_IMAGE_CHANNEL`.
+
+### Fixed
+- **OIDC client stuck on “Waiting account auth” (#326, #304):** `rustdeskUserPayload` now includes `user.info` (required by RustDesk 1.4.x serde). Callback could succeed while auth-query JSON was ignored. Ships via panel update (Go API restart).
+- **Viewer-only outbound “ID not found” with service stopped (#327):** TCP `RegisterPk` binds peer IP for `FindByIP`; punch/relay also accepts a valid BetterDesk client login token. Anonymous initiators stay blocked (#302). Ships via panel update (Go signal restart).
+- **Enrollment outbound gate hardening (#302):** reject initiators that still have `pending_device_<id>` even if a peers row exists. Ships via panel update (Go signal restart).
+- **Web Remote SignedId MITM check + stale server key (#313):** viewer reads `id_ed25519.pub` on each page render (no empty cache if Go starts later); RdClient accepts base64 Key (and hex) and verifies `RelayResponse.pk` with the server key then `SignedId` with the peer identity key (RustDesk chain). Does not change the 3.4.2 panel-proxy allowlist. Ships via panel update. Note: desktop client `Failed to secure tcp: Signature mismatch in key exchange` when the Key field is empty/wrong is expected client config — set Key from Keys page / `id_ed25519.pub`.
+- **Cannot delete seed `admin` with false UI success (#315):** panel delete now checks Go Super Admin parity on dual-SQLite, mirrors delete before local removal, and returns 409/502 instead of success when Go refuses last-admin (no silent backfill restore). Last–Super Admin guard and installer `reset-password.js` / menu reset (username `admin`) are unchanged. Ships via panel update.
+- **Native install TLS self-signed deploy (#325):** `_safe_cp_tls_file` no longer deletes `betterdesk.crt` when source and dest are the same real file (self-signed generated in place). Symlink→copy for Let's Encrypt (#219) is unchanged. Ships via installer / `betterdesk.sh` (not panel-only). Verify: `install.sh --native` completes past “Generating self-signed TLS certificates” with both `/opt/betterdesk/ssl/betterdesk.crt` and `.key` present.
+- **Enrollment Requests UI (#320):** search icon no longer overlaps the placeholder; row dividers stay continuous under Platform/Actions (`display:flex` moved off `<td>`); Platform/Version/Status/Requested/Actions columns centered. Ships via panel update.
+- **MeshAgent `bad web cert hash` behind reverse proxy (#321):** PEM-aware `WebCertHash` (first `CERTIFICATE` SPKI SHA-384) and optional `MESH_WEB_CERT_FILE` for the public TLS cert agents see (e.g. NPM Let's Encrypt), independent of Go `TLS_CERT`. Ships via panel update (Go restart). Verify: mount LE fullchain → set `MESH_WEB_CERT_FILE` → agent registers without web-hash mismatch.
+- **Devices kebab Unban called Ban (#323):** kebab menu passed boolean `device.banned` while the handler only treated the string `'true'` as banned, so Unban opened the Ban modal and POSTed `/ban`. Both boolean and dataset string are accepted now. Ships via panel update.
+- **Client Configuration light theme contrast (#319):** replaced hardcoded dark `rgba(13,17,23,…)` panels with theme tokens (`--bg-tertiary` / `--bg-secondary`) so labels and endpoints stay readable in Light Theme. Ships via panel update.
+
+### Docs
+- **Caddy WebSocket Mode (#294):** client must use WSS (not `ws://` → HTTP 308); `TRUST_PROXY` / `TRUSTED_PROXIES` for correct peer IP after `/ws/id` upgrade. See `docs/setup/REVERSE_PROXY.md`.
+- **Docker channel vs image tag (#299):** documented in `docs/docker/DOCKER_QUICKSTART.md`.
+
+---
+
+## [3.4.13] — 2026-07-28
+
+### Changed
+- _(none yet)_
+
+### Fixed
+- **npm audit (`brace-expansion`):** override bumped to `^5.0.8` (GHSA-mh99-v99m-4gvg) so Web Console CI `npm audit --omit=dev` passes (synced from stable 3.4.2).
+
+---
+
+## [3.4.12] — 2026-07-26
+
+### Changed
+- **UX 3.5 solid shell (performance):** glass/blur disabled in UX 3.5 chrome and content; opaque surfaces only. Classic shell glass branding unchanged. Ships via panel update.
+
+### Fixed
+- **UX 3.5 sidebar fonts jumping on Settings/Updates:** branding live preview no longer writes `--font-family` to `:root`; preview runs only on the Branding tab; chrome uses isolated `--ux35-font-chrome`.
+- **UX 3.5 theme toggle lag:** topbar dark/light now applies a full solid token set immediately and reconciles `branding.css` on load (no longer waits for a second click).
+
+---
+
+## [3.4.11] — 2026-07-26
+
+### Changed
+- **UX 3.5 shell performance:** smoother sidebar resize (pointer capture + rAF, defer localStorage, disable glass blur while dragging), lighter page cards (no `backdrop-filter`), and cleaner tablet/phone drawer overlay fade. Ships via panel update.
+
+---
+
+## [3.4.10] — 2026-07-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.4.9] — 2026-07-26
+
+### Added
+- **FreeBSD (Tier 3 / community):** example `rc.d` scripts and install notes under `contrib/freebsd/`; documented in README platform table and wiki Installation. Refs #310. Manual build only — no CI FreeBSD binaries or panel updater support yet.
+
+### Fixed
+- **Docker AIO supervisord crash on missing NTP/billing env (#299):** entrypoint and Dockerfile now default `NTP_SERVERS` and billing clock vars so Portainer / bare `docker run` / incomplete stacks no longer fail with `ENV_NTP_SERVERS` cannot be expanded. Also fixed corrupted `ENV ENCRYPTED_ONLY=1\nENV RELAY_SERVERS=` (was `ENCRYPTED_ONLY=1nENV` in the image).
+- **Web Remote broken after enrollment outbound gate (#302):** PunchHole/RequestRelay from the panel `/ws/rendezvous` proxy (default loopback CIDRs via `PANEL_SIGNAL_PROXY_CIDRS`) are accepted again without requiring a registered RustDesk peer. Unapproved clients and anonymous public initiators remain blocked. Ships via panel update (Go signal restart).
+
+---
+
+## [3.4.8] — 2026-07-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.4.7] — 2026-07-26
+
+### Changed
+- **Console chrome dual mode:** default UI is again the classic icon rail + flyout. **UX 3.5** is available via a navbar/topbar switch (cookie `bd_ui_shell`, or `?ui=classic|ux35`). Docs: `docs/wiki/UX-3.5.md`. Ships via panel update.
+
+### Fixed
+- **UX 3.5 light theme only recolored the blue topbar:** built-in light/dark palettes in `generateThemeCss()`, `ui-polish.css` on console layout, theme toggle persists palette + glass.
+- **UX 3.5 settings / main content invisible under branding wallpaper:** `.ux35-shell { position:relative; z-index:1 }` and branding background CSS includes `.ux35-shell` / `.ux35-content`.
+
+---
+
+## [3.4.6] — 2026-07-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.4.5] — 2026-07-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.4.4] — 2026-07-26
+
+### Added
+- **UX 3.5 default console shell:** native full-list sidebar + topbar (promoted from retired Beta 3.1), glass branding, Dark/Light/Custom themes in Settings → Branding, resizable sidebar, tablet/phone drawer. Login / RdClient / remote viewer unchanged. Docs: `docs/wiki/UX-3.5.md`. Ships via panel update.
+
+### Fixed
+- **UX 3.5 light theme only recolored the blue topbar:** `branding.css` kept emitting saved dark palette colors, and `ui-polish.css` was not loaded on the console layout — so body/sidebar text stayed light-on-dark. Light/Dark now resolve built-in palettes in `generateThemeCss()`, glass defaults follow the mode, and the topbar theme toggle persists the matching palette.
+- **UX 3.5 settings / main content invisible under branding wallpaper:** console wallpaper uses `body.app-page::before` at `z-index:0` while the old shell raised `.app-layout` to `z-index:1`. UX 3.5’s `.ux35-shell` had no stacking context, so the black wallpaper covered page text (sidebar/topbar still showed via their own z-index). `.ux35-shell` is now `position:relative; z-index:1` and branding background CSS includes `.ux35-shell` / `.ux35-content`.
+
+### Changed
+- **Console chrome:** TeamViewer-style rail/flyout and Desktop Mode are no longer loaded as the management UI; UX 3.5 is the single console interface on `dev`.
+
+---
+
+## [3.4.3] — 2026-07-25
+
+### Fixed
+- **OIDC client login stuck on “Waiting…” (#304):** panel now proxies `GET /api/auth/oidc/callback` (and `/api/oidc/callback`) to the Go API, so Redirect URLs that use the console origin (`:5000` / `:5443`) complete RustDesk SSO instead of returning 404. Settings also validate the callback path and clarify the hint. Ships via panel update. Verify: IdP Redirect URL = `https://<panel>/api/auth/oidc/callback` → SSO in RustDesk finishes with access token (browser shows success page).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.4.2] — 2026-07-28
+
+### Fixed
+- **Web Remote broken after enrollment outbound gate (#313, #302):** PunchHole/RequestRelay from the panel `/ws/rendezvous` proxy (default loopback CIDRs via `PANEL_SIGNAL_PROXY_CIDRS`) are accepted again without requiring a registered RustDesk peer. Unapproved clients and anonymous public initiators remain blocked. Ships via panel update (Go signal restart). Native/all-in-one needs no env change; Docker split console↔server must set `PANEL_SIGNAL_PROXY_CIDRS` to the console CIDR if still denied.
+- **npm audit (`brace-expansion`):** override bumped to `^5.0.8` (GHSA-mh99-v99m-4gvg) so Web Console CI `npm audit --omit=dev` passes on stable.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.4.1] — 2026-07-25
+
+### Fixed
+- **`betterdesk.sh` Online GitHub update leaves Console inactive (#306):** `start_services_with_verification` no longer aborts under `set -e` when `sqlite3` API-key sync fails after Go start; Console always gets `systemctl start`/`restart`, and update no longer prints success when `betterdesk-console` is not Active. Ships via installer script / next stable hotfix (not panel-only). Verify: Update → Online update from GitHub → `systemctl is-active betterdesk-console` is `active` without a manual start.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.4.0] — 2026-07-24
+
+### Added
+- **OIDC login for stock RustDesk desktop clients (#304):** when panel OIDC is enabled, RustDesk Login shows an SSO option (`/api/login-options` + `/api/oidc/auth` / `auth-query`, same IdP config as panel SSO). Ships via panel update (Go API restart). Verify: enable OIDC → client SSO button → IdP login → access token.
+- **Guest Access Links for Web Remote / RdClient (#274):** time-limited opaque links with a device allowlist; guests open `/remote/guest?t=…` without a Console session. Mesh single-device share tunnel auth works with a valid `mesh_share` token.
+- **RustDesk client LDAP/AD login (#218, #260):** desktop/mobile clients use the same directory auth as the web console. Operator guide: `docs/wiki/LDAP-AD.md`.
+- **RustDesk client sessions (#242):** DB-backed tokens (default 7 days, sliding renewal, max 30 days) under Settings → Authentication → RustDesk clients.
+- **MeshCentral compatibility layer:** optional `MESH_ENABLED=Y` — native Go `/agent.ashx` / `/meshrelay.ashx` / `/control.ashx`, inventory, guest share, port relay, recording. See `docs/features/MESHAGENT_ONBOARDING.md`.
+- **BetterDesk Agent Client (alpha):** new Tauri enrollment / remote-agent client tree (`betterdesk-agent-client/`).
+- **Update channel:** Stable (`main`) vs Development (`dev`) in Settings → Updates (and installer scripts).
+
+### Fixed
+- **WebSocket Mode behind Nginx / reverse proxy (#276):** signal WSS no longer builds session keys as `IP:0` from proxied headers; PunchHole/RelayResponse reaches WebSocket initiators. **Manual:** set `TRUST_PROXY=Y` and `TRUSTED_PROXIES=<proxy CIDR>`, restart Go, use IP-only `X-Real-IP`, confirm logs show `effective=<client-ip>:<non-zero-port>`.
+- **WSS relay decryption / mixed protocol (#293, #290):** complete WS message forwarding (no 32 KiB split); reject mixed WSS + native TCP/TLS relay pairs.
+- **Fresh Docker / GHCR install (#299):** image tag sync, credentials helpers, `DB_PATH` for split compose, `su-exec` / UID `betterdesk` for auth.db under `cap_drop: ALL`.
+- **PostgreSQL client login and user sync (#300, #301, #292):** session `created_at` scan, duplicate-user loop, NULL `totp_secret` / `last_login` handling.
+- **OIDC panel SSO authorize redirect (#298):** browser goes to the IdP, not the internal Go API URL.
+- **Linux HTTP/HTTPS protocol toggle (#219):** LE cert copy (not symlink), bind-service / port sync, installer re-exec after update, Go `GO_API_PORT` / signal port isolation.
+- **Web Remote file transfer (#217)** and related RdClient / Web Remote UX (toolbar, monitors, keyboard modes, session picker).
+- **Default admin bootstrap:** remove illegal reassignment of `const password` after create (would TypeError on first-run admin creation).
+
+### Security
+- **Trusted proxy allowlist (#276):** honor `X-Real-IP` / `X-Forwarded-For` only when `TRUST_PROXY=Y` and the direct peer is in `TRUSTED_PROXIES` (empty allowlist ignores forwarded headers).
+- **Enrollment outbound gate (#302):** PunchHole/RequestRelay require a live registered initiator; in managed/locked modes the peer must be approved (pending enrollment alone is refused). Anonymous rendezvous without registration is blocked.
+- **HttpProxyRequest (#296):** schema support with `error: "not supported"` (no open HTTP egress proxy).
+- **Guest WebSocket proxy:** `/ws/rendezvous` and `/ws/relay` validate guest tokens via Go `/guest/access-links/validate` before upgrade (non-empty `?guest=` alone is no longer sufficient).
+- **RustDesk OIDC auth-query:** when the pending login recorded a device `id`/`uuid`, poll requests must supply matching non-empty values (omission no longer skips binding).
+- Dependency / CI hardening: npm audit overrides (`tar` ≥7.5.21), govulncheck, Go toolchain bump, WebSocket auth for bd-signal / remote-agent.
+
+### Changed
+- Stable channel jump from **3.3.39** (previous `main`) through development patches **3.3.40–3.3.174**. Full per-patch history remains below; this section is the operator-facing **3.4.0** release summary (CI renames `[Unreleased]` on merge to `main`).
+
+---
+
+## [3.3.174] — 2026-07-24
+
+### Security
+- Guest WebSocket proxy validates access-link tokens before upgrade; RustDesk OIDC auth-query requires device id/uuid when pending recorded them; `tar` and `golang.org/x/text` bumps for audit/govulncheck.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.173] — 2026-07-24
+
+### Changed
+- Release prep for upcoming stable **3.4.0** (curated notes live under `[Unreleased]` until `dev` → `main` merge).
+
+---
+
+## [3.3.172] — 2026-07-24
+
+### Added
+- **OIDC login for stock RustDesk desktop clients (#304):** when panel OIDC is enabled, `GET /api/login-options` advertises `oidc/<display name>`; clients use `POST /api/oidc/auth` + `GET /api/oidc/auth-query` (same IdP config / redirect family as panel SSO). Ships via panel update (Go API restart). Verify: enable OIDC → open RustDesk Login → SSO button appears → complete IdP login → client receives access token.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.171] — 2026-07-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.170] — 2026-07-24
+
+### Fixed
+- **Fresh Docker install (#299):** `install.sh` default image tag synced to current `VERSION` (was stuck at 3.3.112 while compose/bump used a newer tag); summary falls back to `docker compose exec -u betterdesk … cat .admin_credentials` when `betterdesk-show-admin-credentials` is missing; split layout prints the correct compose service name (`console`). `betterdesk-docker.sh` password reset targets the all-in-one `betterdesk` container on single layout (no longer hardcodes `betterdesk-console`) and runs as UID `betterdesk` so `auth.db` is writable under `cap_drop: ALL`. Legacy split GHCR compose (`docker-compose.quick.yml`) uses `DB_PATH=/opt/rustdesk/db_v2.sqlite3` so the console no longer opens a read-only/orphan peer DB under `console-data` (`SQLITE_READONLY`). All-in-one image: `su-exec` packaged; entrypoint writes `.api_key` / enrollment sentinel as UID `betterdesk` (fresh named volumes inherit image ownership 10001 — root without `CAP_DAC_OVERRIDE` cannot create those files). `betterdesk-show-admin-credentials` falls back to `su` when `su-exec` is absent. `scripts/bump-version.js` now updates `install.sh` pins.
+- **Unapproved Managed/Enrollment clients could start outbound sessions (#302):** signal `PunchHoleRequest` / `RequestRelay` now require a live registered initiator. In `managed` / `locked` modes the initiator must also have an approved peer row in the DB (pending enrollment alone is refused). Anonymous rendezvous without registration is blocked in all modes. Ships via panel update (Go signal restart). Stock RustDesk may still show Ready while pending; outbound connect fails until operator approval.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.169] — 2026-07-23
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.168] — 2026-07-23
+
+### Fixed
+- **Postgres RustDesk `/api/login` Token generation failed (#300):** `CreateClientSession` no longer scans `RETURNING created_at` (TIMESTAMPTZ) into a Go `string`. INSERT now returns `to_char(... UTC)` like the existing session SELECT paths, so client login on PostgreSQL succeeds. Ships via panel update; restart Go, then sign in once in the RustDesk client.
+- **Infinite user-create INSERT loop on PostgreSQL (#301):** panel `userSync.mirrorCreate` no longer POSTs to Go on shared Postgres (row already exists) and no longer recurses into create after a 409 when `GET /users` fails. Go Postgres `ListUsers`/`GetUser*` now `COALESCE(totp_secret, '')` so NULL secrets from panel inserts do not 500 the user list. Duplicate username at the DB layer returns a friendly `username_exists` error instead of a generic 500.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.167] — 2026-07-22
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.166] — 2026-07-22
+
+### Fixed
+- **WSS relay decryption error after PeerInfo / H.265 (#293):** WebSocket relay no longer pipes paired peers through `websocket.NetConn` + `io.Copy`. That path split each large binary frame into ~32 KiB WebSocket messages, so encrypted video failed with `decryption error(0)` while small handshake messages (SignedId, PeerInfo) still worked. Relay now forwards complete WS messages end-to-end (same pattern as MeshCentral WS relay) and raises the WS read limit to 16 MiB.
+- **User delete/demote silent failure on SQLite dual-DB (#292):** Go `ListUsers`/`GetUser*` no longer crash on NULL `last_login`/`totp_secret` (never-logged-in users). Migrate backfills NULLs; `CreateUser` sets `last_login=''`; last-admin guards honor `ListUsers` errors; `DeleteUser` clears `org_users` links. Panel `userSync` logs clearly when Go `/api/users` returns 500 so mirrors are not silently skipped.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.165] — 2026-07-22
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.164] — 2026-07-22
+
+### Fixed
+- **Signal secure TCP `unhandled type <nil>` (#296):** after KeyExchange, modern clients may send `HttpProxyRequest` (protobuf field 27). The Go signal schema stopped at field 26 (`hc`), so decrypt succeeded but `Union` stayed nil and the connection was closed. Proto now includes `HttpProxyRequest`/`HttpProxyResponse`; the server replies with `error: "not supported"` (no open HTTP egress proxy). Empty encrypted frames are soft-ignored; unknown oneof fields log field numbers instead of opaque `<nil>`.
+- **False MaxListenersExceededWarning on panel WebSocket upgrades (#295):** console WebSocket services now share a single HTTP `upgrade` dispatcher instead of stacking 11 separate listeners (Node's default max is 10). Reconnects never added listeners — the warning was a startup false positive, not a reconnect leak. Session `MemoryStore` remains intentional for the single-process console (shared store is for future multi-instance HA only).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.163] — 2026-07-22
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.162] — 2026-07-22
+
+### Fixed
+- **OIDC SSO authorize redirect (#298):** clicking “Sign in with OIDC” no longer browser-redirects to the internal Go API URL (`http://localhost:21114/...`). The panel resolves the IdP authorize URL server-to-server and sends the browser only to the identity provider.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.161] — 2026-07-22
+
+### Security
+- **Trusted proxy allowlist (#276):** Go signal/API honor `X-Real-IP` / `X-Forwarded-For` only when `TRUST_PROXY=Y` **and** the direct peer is listed in `TRUSTED_PROXIES` (CIDR/IP). Empty allowlist ignores forwarded headers (prevents spoofing if the Go port is reachable). WebSocket initiator delivery uses exact `ip:port` (`wsPunchConns`) so shared-NAT peers no longer receive another client's PunchHole/RelayResponse / signed PK.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.160] — 2026-07-21
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.159] — 2026-07-21
+
+### Fixed
+- **Public Client Endpoints survive Docker recreate (#291):** Settings → Public client endpoints now persist on the `console-data` volume (`/app/data/public-endpoints.env`) instead of only ephemeral `/app/.env`. Optional Compose `PUBLIC_*` env vars override when non-empty; empty Compose keys no longer mask saved values.
+- **Mixed WSS / native relay crash (#290):** relay sessions that pair a WebSocket peer (`:21119`) with a native TCP/TLS peer (`:21117`) are rejected instead of forwarding incompatible framings (`invalid message format` / `payload too large`). Signal returns `RefuseReason: Protocol mismatch…` when initiator and target connection types differ (WebSocket Mode vs native).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.158] — 2026-07-21
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.157] — 2026-07-21
+
+### Security
+- **npm audit:** bump `protobufjs` to ≥7.6.5 and override `body-parser` to ≥1.20.6 (DoS advisories).
+- **CI:** Secret Scan installs ripgrep before fingerprint script; CodeQL advanced workflow no longer runs on every push (conflicts with GitHub default setup SARIF upload).
+- **Go signal:** keepalive timing overrides use atomics so `-race` tests no longer flake.
+- **Go toolchain:** bump `betterdesk-server` toolchain to `go1.26.5` for govulncheck (GO-2026-5856 / stdlib TLS fixes).
+
+### Fixed
+- **Mesh relay:** `go vet` context cancel leak in `meshcentral/relay_ws.go` (defer cancel on all paths).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.156] — 2026-07-20
+
+### Security
+- **Dependabot:** bumped `axios` to ≥1.18.0 and `brace-expansion` override to ≥1.1.16 in `web-nodejs` (DoS / prototype-pollution advisories).
+- **CodeQL:** explicit `rdClientPageLimiter` on public mesh share/desktop routes; OIDC session redirect validates configured panel base instead of `HasPrefix`; ConnLimiter int→int32 clamp uses `math.MaxInt32`; clipboard test DOMParser mock uses stable multi-pass strip.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.155] — 2026-07-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.154] — 2026-07-20
+
+### Fixed
+- **Guest Web Remote 500 + cookie hijack (#274):** `/remote/guest` no longer crashes during EJS render (guest bootstrap JSON uses the same safe pattern as the viewer). Panel sessions with `device.connect` win over a stale `betterdesk.guest` / `bd.guest` cookie, so operators are not hard-403’d on other device IDs after opening a guest link. Guest cookie is cleared on login and on `GET /remote` dashboard; RD WebSocket upgrades prefer `?guest=` on the session URL.
+- **SQLite dual-DB local password for RustDesk client (#260):** startup `backfillFromNode` now copies the panel `password_hash` into missing Go `users` rows instead of creating a random placeholder password, so local panel passwords work for desktop client login without a manual reset.
+
+### Changed
+- **LDAP settings discoverability (#260):** Enrollment sub-tab hints that LDAP/AD and OIDC live under their own Authentication tabs; operator wiki and `ldap_enabled_hint` no longer imply LDAP fallthrough for local accounts.
+
+---
+
+## [3.3.153] — 2026-07-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.152] — 2026-07-20
+
+### Fixed
+- **WebSocket Mode relay timeout behind Nginx (#276 residual):** after the session-key fix, ephemeral WSS `RequestRelay` connections still failed because the signal server sent an immediate empty keepalive after HTTP 101. Desktop clients parse that as `RendezvousMessage{union:None}` and disconnect before `RelayResponse`. Keepalives now start after `RegisterPeer`/`RegisterPk`, or after a short idle delay only when the client has not sent any frame yet. Stale closed `WSConn` handles are cleared on forward failure.
+- **RustDesk address book login “Token generation failed” (#284):** `POST /api/login` now logs the underlying `issueClientSession` error, validates user id before insert, and recreates the `client_sessions` table if a post-update DB was missing the #242 schema. Restart Go after panel update, then sign in once in the RustDesk client.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.151] — 2026-07-18
+
+### Fixed
+- **Linux installer stale script after update (#219):** after Update replaces `betterdesk.sh` on disk, the interactive manager re-execs itself so Repair / Protocol Toggle use the new post-toggle tests (avoids false `HTTP redirect … on :5000` from the old in-memory script). Recreating systemd units preserves `PORT`/`HTTPS_PORT` from `.env` instead of resetting to `5000`/`5443`. Standard HTTPS (`:443`) post-tests always probe redirect on `:80`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.150] — 2026-07-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.149] — 2026-07-18
+
+### Added
+- **Guest Access Links for Web Remote / RdClient (#274):** operators can create a time-limited opaque link with a device allowlist. Guests open `/remote/guest?t=…`, see only those devices, and cannot use the plus/session-picker/quick-connect paths to reach other peers. No panel Console session is created. Mesh single-device share tunnel auth no longer requires a panel login when `mesh_share` is valid.
+
+### Fixed
+- **Linux HTTP/HTTPS post-toggle false fail (#219):** when the panel uses `HTTPS_PORT=443` / `PORT=80`, post-configuration tests no longer probe a stale `Environment=PORT=5000` from the systemd unit. Effective settings prefer `.env` (matches `EnvironmentFile=` precedence), standard-port repair syncs `PORT`/`HTTPS_PORT` into `betterdesk-console.service`, and redirect checks fall back to `:80` when that listener is active.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.148] — 2026-07-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.147] — 2026-07-16
+
+### Added
+- **RustDesk client login → device owner (#270):** successful client login maps the device (`peers.user`) to the BetterDesk account for inventory/audit (shared logins, credential misuse). Does **not** block remote connections.
+
+### Fixed
+- **WebSocket mode behind Nginx (#276):** signal WSS no longer builds session keys as `IP:0` / `[IP:port]:0` from `X-Real-IP` / `X-Forwarded-For`. Forwarded addresses are parsed correctly when `TRUST_PROXY=Y`, and async PunchHole/RelayResponse delivery reaches WebSocket initiators (not only TCP punch connections).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.146] — 2026-07-16
+
+### Fixed
+- **Windows panel update (#272):** default install under `C:\BetterDeskConsole` no longer treats drive root `C:\` as the project root. Installer/Docker files are written beside the console (avoids `EPERM: mkdir 'C:\'`), quick compose filenames are non-critical for SHA tracking, and NSSM `Access is denied` when restarting BetterDeskServer no longer leaves a stuck “updates available” state.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.145] — 2026-07-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.144] — 2026-07-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.143] — 2026-07-14
+
+### Fixed
+- **External reverse proxy (#267):** wizard asks whether Caddy/Nginx runs on the same host; remote-proxy setups get `HOST=0.0.0.0` and LAN upstream in generated snippets (instead of always `127.0.0.1`).
+- **OIDC SSO login (#269):** after IdP callback on the Go API port, the browser is redirected to the configured **Panel URL** (Settings → Authentication → OIDC) so the Node.js console can create the session cookie. Fixes `Invalid or missing credentials` on Docker / split-port setups. Also preserves post-login return URL from OAuth state and shows OIDC error messages on the login page.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.142] — 2026-07-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.141] — 2026-07-14
+
+### Added
+- **External reverse proxy guidance (#267):** new [docs/setup/REVERSE_PROXY.md](docs/setup/REVERSE_PROXY.md); `betterdesk.sh` **External reverse proxy** mode (SSL menu **C** / Protocol Toggle **T**) applies `TRUST_PROXY=Y`, binds panel to localhost, enables Go `-trust-proxy`, and writes Caddy/Nginx snippets under `$RUSTDESK_PATH/reverse-proxy/`.
+
+### Changed
+- **Linux HTTP/HTTPS toggle (#219):** Node panel no longer pre-emptively downgrades `HTTPS_PORT=443` / `PORT=80` when `CAP_NET_BIND_SERVICE` is granted — detects ambient capability or `BETTERDESK_HAS_BIND_SERVICE=1` in the systemd unit. Repair HTTPS/TLS syncs `PORT=80` when `HTTPS_PORT=443`; installer health checks and post-toggle tests hint when the panel bound a fallback port (`:5443` / `:5000`).
+
+---
+
+## [3.3.140] — 2026-07-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.139] — 2026-07-14
+
+### Docs
+- **LDAP operator guide:** `docs/wiki/LDAP-AD.md` — AD setup, RustDesk client login, troubleshooting; cross-links from User Management wiki.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.138] — 2026-07-13
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.137] — 2026-07-12
+
+### Security
+- **npm (dev):** bumped vitest/vite/esbuild in root and agent-client lockfiles; added `web-nodejs` overrides for `@babel/core` and `js-yaml` (Dependabot alerts #40–#48).
+- **CodeQL:** `NewConnLimiterFromInt` for relay per-IP limits; removed dead `deepSet` from `patch-role-scope-i18n.js`; extended Dependabot npm coverage to repo root and agent-client; added `go/incorrect-conversion-between-integer-types` query filter.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.136] — 2026-07-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.135] — 2026-07-12
+
+### Security
+- **Pre-3.4 hardening:** committed `web-nodejs/package-lock.json`; CI uses `npm ci` and blocks moderate+ npm audit findings; added `govulncheck` (Go), `cargo audit` (Tauri), Dependabot for npm/gomod.
+- **Logging:** central Node logger (`LOG_LEVEL`, username redaction in stdout and `audit_log.details`); Go server `-log-level` / `LOG_LEVEL` filtering.
+- **WebSocket auth:** `/ws/bd-signal` validates enrollment/access tokens; `/ws/remote-agent` requires single-use token from `POST /api/bd/remote-agent-token` or valid enrollment token; removed agent-client device_id token fallback.
+- **Relay:** active paired sessions counted against per-IP limit (separate from pairing-phase limit); startup ERROR when `ENROLLMENT_MODE=open` without TLS on signal/relay.
+
+### Changed
+- Docker console build uses `npm ci --omit=dev` instead of `npm install --production`.
+
+---
+
+## [3.3.134] — 2026-07-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.133] — 2026-07-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.132] — 2026-07-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.131] — 2026-07-09
+
+### Security
+- **CodeQL:** advanced setup workflow (`.github/workflows/codeql.yml`) wires `.github/codeql/codeql-config.yml` so documented exclusions apply; `patch-role-scope-i18n.js` hardened against prototype pollution (`UNSAFE_NESTED_KEYS` guard).
+- **XSS (org/CDAP pages):** page routes validate `orgId` / `deviceId` via `assertSafeApiId`; views escape IDs with server-side `escapeHtml`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.130] — 2026-07-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.129] — 2026-07-09
+
+### Fixed
+- **RustDesk client sessions (#242):** desktop/mobile clients no longer drop out after ~24 hours. Login now uses DB-backed session tokens (default **7 days**, sliding renewal on activity, max **30 days**). Configure under **Settings → Authentication → RustDesk clients**. Ships via panel update; sign in once in the client after updating.
+- **Linux HTTP/HTTPS toggle (#219):** Go server now honours `GO_API_PORT=21114` over shared `.env` `API_PORT=21121` (Node Client API proxy), matching existing `SIGNAL_PORT` isolation. Installer and panel update patch `Environment=GO_API_PORT=21114` on `betterdesk-server.service`; post-toggle tests wait for Go API and hint when handlers leaked to `:21121`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.128] — 2026-07-09
+
+### Changed
+- _(none yet)_
+
+### Docs
+- **Server migration:** added manual / out-of-order migration troubleshooting (native install + `rust2go`, `TestNatRequest` without registration) in `docs/troubleshooting/SERVER_MIGRATION.md`.
+
+---
+
+## [3.3.127] — 2026-07-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.126] — 2026-07-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.125] — 2026-07-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.124] — 2026-07-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.123] — 2026-07-07
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.122] — 2026-07-07
+
+### Fixed
+- **Linux HTTP/HTTPS toggle (#219)** — `ensure_betterdesk_console_user` no longer prints repair warnings to stdout (they corrupted `User=` in `betterdesk-console.service` → `bad-setting`). Added `repair_console_service_user_line`, unified HTTPS repair on update/toggle, `SIGNAL_PORT=21116` / `RELAY_PORT=21117` in panel update service patch, ExecStartPre exits 0 on LE warnings-only, and port cleanup after graceful stop.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.121] — 2026-07-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.120] — 2026-07-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.119] — 2026-07-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.118] — 2026-07-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.117] — 2026-07-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.116] — 2026-07-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.115] — 2026-07-06
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.114] — 2026-07-06
+
+### Added
+- **Web Remote — File Transfer drop zone:** left panel shows a drag-and-drop upload box (click to pick files, multi-file supported). Uploads go to the folder currently open on the remote side; progress appears in the Transfers column.
+- **Web Remote — RustDesk file transfer parity:** 128 KB blocks, zstd upload compression, resume via `offset_blk` / `transferred_size`, overwrite confirmation dialog (Skip / Overwrite / apply to all), remote context menu (rename, delete, new folder), hidden-files toggle, and Resume in the transfer queue after errors.
+- **Panel updater:** GitHub raw file downloads retry automatically on HTTP 429/502/503/504 (exponential backoff), reducing failed locale syncs during large updates.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.113] — 2026-07-06
+
+### Changed
+- **Docker — official single container (default):** `install.sh` and quick-start docs now deploy one pre-built image (`ghcr.io/unitronix/betterdesk`) via `docker-compose.quick.single.yml`. Updates are a single `docker compose pull && up -d`. Legacy two-container layout remains available with `install.sh --split` or `docker-compose.quick.yml`. Panel update instructions respect `BETTERDESK_DOCKER_LAYOUT` (`single` vs `split`). Migrating from split to single reuses the same named volumes; RustDesk client API URL changes from port `21114` to `21121`.
+
+---
+
+## [3.3.112] — 2026-07-05
+
+### Fixed
+- **Panel ID change (regression on v3.3.101):** Web Console no longer forces custom device IDs to uppercase — case is preserved end-to-end (`MacPro1` stays `MacPro1`, not `MACPRO1`). After a panel-side rename, the Go signal server redirects heartbeats from the stale client ID to the successor row (preventing duplicate offline/online peer entries) and pushes a `PeerDiscovery` `change_id` notification to connected clients. Panel DB cascade uses the exact case sent to the Go API.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.111] — 2026-07-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.110] — 2026-07-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.109] — 2026-07-05
+
+### Fixed
+- **Email/SMTP settings (Fixes #240):** Settings → Email “Test connection” no longer returns HTTP 415 — SMTP save/test/load now use `Utils.api()` so requests include `Content-Type: application/json` required by panel API middleware.
+- **Panel tabs redirect to dashboard (401):** RustDesk client API routes (`GET /api/devices`, `/api/strategies`) no longer shadow panel session routes — browser requests without Bearer token fall through to panel handlers; `users.js` uses `/api/panel/strategies`; `Utils.api` no longer redirects logged-in users to `/login` (which bounced to dashboard) on incidental 401.
+- **Devices/Users 429 rate limit:** extended panel poll whitelist (`/api/folders`, `/api/tags`, `/api/device-groups`, `/api/bd/notifications`, `/api/panel/*`); dedicated limiter for `POST /api/desktop/layout`; staggered Devices page API loads; desktop widget layout saves gated when desktop mode is inactive.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.108] — 2026-07-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.107] — 2026-07-05
+
+### Fixed
+- **Server Admin navigation:** `server_admin` can open sidebar pages gated by `server.config` (Policies, Attestation, DataGuard, Generator, Users) — routes no longer require legacy `admin`/`global_admin` only; 403 template fixed for role checks; stale desktop-mode overlay cleared on load.
+- **Dashboard 429 rate limit:** panel poll endpoints (`/api/dashboard/client-config`, activity, widgets, stats, etc.) now use the higher widget quota and no longer consume the 100/min general API budget — fixes `Too Many Requests` on dashboard load/refresh.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.106] — 2026-07-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.105] — 2026-07-05
+
+### Added
+- **User scope UX (#227):** User Management now assigns **folders**, **direct devices**, and **RustDesk Pro strategies** per user; effective device count badge; folder ACL supports **allowed user groups**; optional **restricted default visibility** in Settings (`DEVICE_SCOPE_DEFAULT` / panel setting); docs [SCOPED_REMOTE_USER.md](docs/features/SCOPED_REMOTE_USER.md) and draft GitHub reply.
+
+### Changed
+- **Role labels (UI only):** `operator` → “Remote Operator”, `pro` → “Pro License (client API only)”; dynamic role descriptions and scope hints in user form (all 26 locales).
+
+---
+
+## [3.3.104] — 2026-07-05
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.103] — 2026-07-05
+
+### Fixed
+- **Device ID change (#213):** RustDesk 1.4.x client rename works again — the server accepts `RegisterPk` ID-change requests with an empty PK (stock client wire format) instead of returning `NOT_SUPPORT` / “Not yet supported by the server”.
+- **Panel ID change:** Permanent delete now clears `id_change_history` so released IDs can be reused; panel/API ID changes cascade to enrollment tokens, org assignments, and linked peers; renamed-ID registration allows the same device (matching IP or PK/UUID) to stay connected after a panel-side rename.
+- **Panel sync:** Go `peer_id_changed` events now cascade panel DB rows in real time; periodic Go→panel sync applies client-side renames; hard delete purges stale panel `peer` rows; BD-API `/register` uses the same identity-aware rename guard as the signal server.
+
+### Changed
+- **Panel UX:** Device list reloads on live ID-change events; online-device warning before change-ID from both list and detail views.
+- **RustDesk Pro parity:** Panel strategies manager on Devices page; org address book structured editor; `/api/device-group/accessible` returns accessible payload (matches Go); Go API supports `POST /api/device-group`, strategy update/delete; device detail panel receives live status and ID-change events.
+- **RustDesk Pro strategy assign:** Direct device/user/device-group strategy assignments via `POST /api/strategies/assign`, `GET /api/strategies/{guid}`, `PUT /api/strategies/{guid}/status`, and `GET /api/devices` (id + guid); panel UI “Assign targets” on the strategies manager; BetterDesk Go server mirrors the same endpoints.
+
+---
+
+## [3.3.102] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.101] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.100] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.99] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.98] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.97] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.96] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.95] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.94] — 2026-07-04
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.93] — 2026-07-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.92] — 2026-07-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.91] — 2026-07-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.90] — 2026-07-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.89] — 2026-07-03
+
+### Fixed
+- **Linux HTTP/HTTPS toggle (#219)** — `betterdesk-server.service` now sets `SIGNAL_PORT=21116` / `RELAY_PORT=21117` so panel `PORT=5000` in `.env` no longer makes the Go signal server bind `:5000` (conflict with the HTTPS redirect listener). Let's Encrypt redeploy removes same-path symlinks before `cp` (`cp: same file`). New **Repair → Repair HTTPS / TLS** menu path runs stuck-state repair (LE copy + signal ports); post-toggle tests wait for Go on `:21116` and surface the `:5000` mis-bind hint.
+- **Deleted device ID management (#213):** Devices list now has a **Show deleted devices** toggle. Soft-deleted rows can be **Restored** or **permanently deleted** (releases the ID for reuse). Hard delete works for already-soft-deleted peers; change-ID conflicts map to a clear panel message instead of a generic server error.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.88] — 2026-07-03
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.87] — 2026-07-01
+
+### Fixed
+- **RustDesk desktop WSS immediate EOF on `/ws/id`** — The Go signal WebSocket endpoint now sends an immediate empty keepalive frame after HTTP 101, honours `X-Forwarded-For` / `X-Real-IP` on upgrade, binds `WSConn` on `RegisterPeer`, and supports `WS_DEBUG_FRAMES=1` for first-frame diagnostics. Reported in ([#229](https://github.com/UNITRONIX/BetterDesk/issues/229)).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.86] — 2026-06-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.85] — 2026-06-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.84] — 2026-06-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.83] — 2026-06-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.82] — 2026-06-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.81] — 2026-06-30
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.80] — 2026-06-29
+
+### Fixed
+- **Linux HTTP/HTTPS toggle hotfix (#219)**: `linux-ensure-console-user.js` contained a bash syntax fragment (`if [ -z ...`) that crashed the console on every start — fixed. LE repair also resolves the certbot live dir from the certificate SAN when `LE_CERT_LIVE_DIR` is missing.
+- **Linux HTTP/HTTPS toggle follow-up (#219)**: panel updates and `betterdesk.sh` updates re-run Let's Encrypt TLS repair; SSL menu (C) unified with Protocol Toggle (T); post-toggle tests wait for Node boot.
+
+### Changed
+- **Let's Encrypt installer messaging (#219)**: after LE setup, the installer reminds operators to open `https://<domain>:5443` (IP access shows certificate name errors).
+
+---
+
+## [3.3.79] — 2026-06-28
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.78] — 2026-06-28
+
+### Fixed
+- **Linux Let's Encrypt HTTPS toggle (#219)**: `betterdesk.sh` now **copies** certbot material into `$RUSTDESK_PATH/ssl/` (real files with `root:betterdesk` permissions) instead of symlinking into `/etc/letsencrypt/` — the console service user could not read LE private keys and silently fell back to HTTP on `:5000`. Certbot deploy hook re-copies renewed certs; `ensure_betterdesk_console_user` repairs legacy symlink installs; post-toggle tests verify the console user can read the TLS key.
+
+### Changed
+- **Sensitive data anonymization**: removed operator-specific LAN IP, SSH user, and developer paths from public docs and examples; operator deploy runbooks moved to gitignored `docs/private/`; security contact updated; CI checks block regression (`scripts/check-no-sensitive-paths.sh`, `.gitleaks.toml`).
+
+---
+
+## [3.3.77] — 2026-06-27
+
+### Fixed
+- **Organization device groups (#221)**: editing a device group from the Devices page (e.g. switching to automatic tag membership) no longer clears `team_id`, so groups stay linked to their organization and org-scoped access is preserved.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.76] — 2026-06-27
+
+### Fixed
+- **Public RustDesk client endpoints (#222)**: Dashboard client configuration, QR codes, deploy strings, and Keys page now honor `PUBLIC_SERVER_ID`, `PUBLIC_RELAY_SERVER`, and `PUBLIC_API_URL` when the console hostname differs from ID/relay/API (reverse proxy / split DNS). Settings → Public client endpoints edits `.env` without a console restart. `PANEL_PUBLIC_HOST` and Dashboard **Client server address** remain as fallbacks.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.75] — 2026-06-27
+
+### Fixed
+- **NTP servers for billing clock (#223)**: `betterdesk-server` now loads `NTP_SERVERS` and billing clock vars from console `.env` (Linux `EnvironmentFile` + update migration). Added `BILLING_TRUST_OS_NTP` fallback when OS time sync is healthy but public NTP is blocked. Commercialization → Settings exposes NTP configuration with Go server restart.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.74] — 2026-06-27
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.73] — 2026-06-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.72] — 2026-06-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.71] — 2026-06-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.70] — 2026-06-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.69] — 2026-06-26
+
+### Fixed
+- **Web Remote file transfer (#217)**: upload now sends the full destination file path (not just the directory); downloads default to the browser Downloads folder; transfer queue shows phases, progress, cancel, and stall timeout; drag-and-drop overlay on the remote panel; optional local folder save via File System Access when chosen.
+- **Web Remote file transfer protocol (#217)**: fix inverted RustDesk FileAction mapping — download uses `send` (full remote path), upload uses `receive` (remote dir + FileEntry); upload sends `send_confirm` before blocks; optional zstd block decompress on download.
+- **Panel update sudoers bootstrap (Linux)**: `linux-ensure-console-user.js` is whitelisted in sudoers and invoked via passwordless sudo during updates; server binary deploy refreshes sudoers as root so new privileged helpers (e.g. `linux-write-systemd-unit.js`) apply without a manual root step.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.68] — 2026-06-26
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.67] — 2026-06-26
+
+### Fixed
+- **OIDC SSO login (#225)**: panel callback now calls the missing `exchangeOIDCCode` Go API client method so one-time auth codes are exchanged server-to-server after IdP redirect (fixes `TypeError: betterdeskApi.exchangeOIDCCode is not a function`).
+- **RdClient desktop (#226)**: Windows build — pass `&str` to WebView2 `additional_browser_args` (fixes compile error after GPU/media args refactor).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.66] — 2026-06-24
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.65] — 2026-06-24
+
+### Fixed
+- **Web Remote file transfer (#217)**: opens a dedicated `FILE_TRANSFER` relay session (separate from the desktop tunnel) so RustDesk peers handle `FileAction` messages. Replaces the side panel with a RustDesk-style centered modal (local | remote | transfer queue); local folder browsing uses the File System Access API on Chrome/Edge with HTTPS fallback. CDAP snapshot sessions disable the file-transfer toolbar button.
+- **Panel update systemd unit patch (Linux)**: service config cleanup no longer calls interactive `sudo tee`; uses a whitelisted passwordless-sudo helper for `betterdesk-server.service` / `betterdesk-console.service` after `linux-ensure-console-user.js` refreshes sudoers.
+
+### Changed
+- **Web Remote toolbar UX**: hides “Connected” status text and frame count while streaming; removes the in-viewer language picker. Fullscreen (toolbar button, handle, F11) now covers the tab bar, viewer, and floating toolbar via `#rd-viewer-shell`.
+
+---
+
+## [3.3.64] — 2026-06-24
+
+### Fixed
+- **RustDesk client LDAP login (#218)**: `POST /api/login` on the Go API now uses the same provider-bound LDAP/AD authentication as the web console (`/api/auth/login`). LDAP-bound and auto-provisioned directory users can sign in to the RustDesk desktop client with domain username/password; TOTP still applies when enabled locally.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.63] — 2026-06-24
+
+### Fixed
+- **Linux HTTP/HTTPS protocol toggle (#219)**: `betterdesk.sh` now syncs `.env` and `betterdesk-console.service` consistently (`RUSTDESK_API_TLS`, SSL paths, redirect flags); health checks use `HTTPS_PORT` (5443) instead of conflating with `PORT` (5000); post-toggle tests probe Client API with the correct scheme. Panel HTTP→HTTPS redirect uses 307 + `no-store`; HSTS is skipped when `ALLOW_SELF_SIGNED_CERTS=true` so toggling back to HTTP does not leave year-long browser enforcement.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.62] — 2026-06-22
+
+### Fixed
+- **RdClient Web phone gate**: fixed mobile device detection that blocked access on PC, tablets, and unfolded foldables with “Remote desktop requires a larger screen”. Gate now respects `[hidden]`, skips zero-width false positives, excludes fine-pointer desktops, and re-evaluates on viewport resize. Ships via Settings → Updates.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.61] — 2026-06-21
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.60] — 2026-06-21
+
+### Changed
+- **Mesh layer closure**: `MESH_ENABLED=Y` default in Go config; installers (`betterdesk.sh` / `betterdesk.ps1`) and panel updater inject `MESH_ENABLED=Y` on existing Linux/Windows services; mesh cert backup on update.
+- **Panel**: Settings mesh groups + session recordings list + onboarding; Devices `mesh_agent` filter, linked-peer badge, power/port menu; remote server-side recording toggle; i18n for all locales.
+- **Go mesh**: KVM relay multiplex (multi-viewer), WoL wake fallback via `linked_peer_id`, recordings list/download APIs, device group assign, `mesh.terminal` / `mesh.files` / `mesh.power` RBAC.
+- **Docs/tests**: [MESH_REST_AUTOMATION.md](docs/features/MESH_REST_AUTOMATION.md), updated compat gap table; `mesh.routes` Jest test; stabilized MeshAgent live test timeout.
+
+---
+
+## [3.3.59] — 2026-06-21
+
+### Added
+- **MeshCentral compatibility layer** (optional `MESH_ENABLED=Y`): native Go implementation of `/agent.ashx`, `/meshrelay.ashx`, and `/control.ashx` for unmodified MeshAgent binaries; unified inventory with `mesh_agent` device type; rdclient web `transport=mesh`; REST helpers (`/api/mesh/*`, `POST /api/peers/{id}/exec`); panel `.msh` download and `.ashx` WebSocket proxy. See [docs/features/MESHAGENT_ONBOARDING.md](docs/features/MESHAGENT_ONBOARDING.md).
+
+### Changed
+- **Mesh agent assets**: AGPL **BetterCore** (`bettercore.js`) and **BetterViewer** (`betterviewer.js`) replace vendored upstream MeshCentral JavaScript.
+- **BetterCore phase 2**: consent prompts, WebRTC tunnel handoff, PowerShell terminals (`p=6`/`p=9`); interop CI with simulated handshake + live MeshAgent binary job.
+- **Mesh operator tools**: guest desktop share links (`mesh_share`), TCP/UDP port relay (`POST /api/mesh/devices/{id}/tcp` / `udp`), device power actions (sleep/reset), session recording to `.mcrec`, Settings → MeshCentral section, linked-peer UX in device menu.
+
+---
+
+## [3.3.58] — 2026-06-21
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.57] — 2026-06-21
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.56] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.55] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.54] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.53] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.52] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.51] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.50] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.49] — 2026-06-20
+
+### Changed
+- RustDesk mass-deployment docs and dashboard helpers for Intune/PSADT: correct `--config` deploy string format, editable client server address, **Copy deploy string** / **Intune script** on Dashboard, `PANEL_PUBLIC_HOST` env, and `scripts/deploy/rustdesk-apply-config.ps1.example` (#209).
+
+---
+
+## [3.3.48] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.47] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.46] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.45] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.44] — 2026-06-20
+
+### Changed
+- Hardened RustDesk client change-ID handling so only the active owner of the old ID can rename it, and soft-deleted device IDs remain reserved instead of being moved by client-side ID changes (#213).
+
+---
+
+## [3.3.43] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.42] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.41] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.40] — 2026-06-20
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.39] — 2026-06-19
+
+### Changed
+- **Organization shared address book panel (#190):** the organization detail page now exposes the missing Address Book tab, including JSON editing, sharing toggle, and import from assigned org devices. Members still receive the shared contacts through RustDesk address book sync while personal entries remain private.
+
+---
+
+## [3.3.38] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.37] — 2026-06-18
+
+### Changed
+- **Docker admin password seeding (#204):** `ADMIN_PASSWORD` now maps to the internal Go and Node.js first-run admin seed variables in quick-start, MACVLAN, and single-container Docker deployments. Existing admin accounts are still left unchanged on restart; use the password reset flow or fresh volumes to change an already-created admin.
+
+---
+
+## [3.3.36] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.35] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.34] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.33] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.32] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.31] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.30] — 2026-06-18
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.29] — 2026-06-18
+
+### Fixed
+- **Device ID reuse after deletion (#213):** changing a device ID to a value reserved by a soft-deleted peer now returns a clear conflict instead of a generic server error. The panel also explains that normal delete keeps the ID reserved and offers permanent deletion when an operator intentionally wants to release the ID for reuse.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.28] — 2026-06-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.27] — 2026-06-17
+
+### Fixed
+- **Web Console CI / dependency audit:** bump `nodemailer`, `multer`, `ws`, and transitive `form-data` minimums so `npm audit --omit=dev --audit-level=high` passes on the release branch.
+
+---
+
+## [3.3.26] — 2026-06-17
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.25] — 2026-06-17
+
+### Fixed
+- **RustDesk client login with console 2FA (#203)** — console password changes now mirror to the Go user store, and SQLite installs mirror console TOTP enable/disable state into the Go `users` row used by `/api/login`. RustDesk clients should now receive the expected `email_check` / `tfa_check` challenge instead of `Invalid credentials` or password-only login when console 2FA is enabled. No TOTP bypass endpoint was added.
+
+---
+
+## [3.3.24] — 2026-06-17
+
+### Fixed
+- **Bare-metal console startup (#206)** — `betterdesk-console` failed with `SQLITE_READONLY_DIRECTORY` on `db_v2.sqlite3` because the unprivileged `betterdesk` user could not write to the Go server data directory. Installer and `linux-ensure-console-user.js` now apply setgid group-write on `$RUSTDESK_PATH`, re-sync permissions after the Go server starts, and verify both console `data/` and Go data dirs before marking permissions OK. **Verify:** `systemctl status betterdesk-console` is `active`; panel loads on port 5000 or 5443. Ships via Settings → Updates or `betterdesk.sh` update/repair.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.23] — 2026-06-15
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.22] — 2026-06-14
+
+### Added
+
+- **RdClient desktop (production hardening):** server URL validation via `GET /api/bd/server-info` and `probe_server_url`; extended `config.json` (`tls_strict`, `ui_lang`, `discovered_via`); `BETTERDESK_SERVER_URL` env and embedded `betterdesk-rdclient.json` on first launch; LAN discovery (UDP port 21119 + optional mDNS `_betterdesk._tcp`); local **Settings** window (change URL, TLS, sign out, factory reset); peer **Remember device password** vault (IndexedDB AES-GCM per device); language switcher on `/remote/login`, dashboard, and viewer (26 locales); **Generator → RdClient desktop** bundles with `rdclientBuildWorker` (6 platform variants, embedded panel URL).
+
+### Changed
+
+- **RdClient codecs (Linux):** WebKitGTK skips unreliable AV1 negotiation; runtime fallback to VP9/H.264 on decode failure.
+- **RdClient dashboard:** unified sidebar + device panel scrolling; desktop settings button in header.
+
+### Manual steps (build host)
+
+- RdClient installer builds require **Rust stable**, **npm**, **@tauri-apps/cli**, and Linux deps (`webkit2gtk4.1-devel`, `openssl-devel`, …) on the panel build host. Optional: `npm install bonjour-service` in `web-nodejs` for mDNS panel publish (`PANEL_MDNS=off` to disable).
+
+---
+
+## [3.3.21] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.20] — 2026-06-14
+
+### Fixed
+
+- **RdClient dashboard (web):** address book and sidebar scroll inside fixed columns with hidden scrollbars; `.rd-desk-content` flex chain fixed so the device grid no longer stretches the window.
+- **RdClient video (AV1):** WebKit uses software AV1 decode; agent `codec_string` is passed to `VideoDecoder`; AV1 keyframes build `description` (av1C); failed codecs auto-reconnect with VP9/H.264.
+- **RdClient desktop:** **Connect** from the loaded `/remote` dashboard — runtime ACL for the configured panel origin (fixes LAN IP:port invoke), injected Connect bridge in the desktop shell (works before panel JS update), correct Tauri invoke args (`deviceId` / `deviceName`), and a new app window loading the same `/remote/:id` viewer as the web panel; session window **Back** closes the desktop window (injected handler + no `/devices` fallback).
+- **RdClient desktop (performance):** Linux Wayland keeps WebKit DMA-BUF/GPU compositing enabled by default; vendor-specific VA-API (Intel `iHD`, AMD `radeonsi`, NVIDIA when `nvidia-vaapi-driver` is present); GStreamer hardware decoder rank for AV1/H264/VP9/H265; session windows disable background throttling; Windows WebView2 AV1/HEVC GPU decode flags; WebCodecs probes multiple AV1/H264 profiles for WebKitGTK compatibility.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.19] — 2026-06-14
+
+### Added
+
+- **RdClient desktop (Phase C — MVP):** new `rdclient-desktop/` Tauri v2 operator shell — first-run panel URL setup, main window loads `{url}/remote`, **Connect** opens a separate session window (`/remote/:id`); web dashboard uses `open_session` when `__TAURI__` is present. **Linux:** automatic X11/Wayland session detection and WebKitGTK workarounds (Gdk error 71 on Wayland). **TLS:** accepts **HTTP** and **HTTPS** with self-signed, Let's Encrypt, or incomplete-chain certs (operator panels); set `BETTERDESK_TLS_STRICT=1` for strict system CA validation only. Not yet distributed via Settings → Updates (build from source).
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.18] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.17] — 2026-06-14
+
+### Added
+
+- **RdClient dashboard (web):** **Tools → Remote Desktop** opens `/remote` in a new browser tab — standalone operator address book with folders, device groups, tags, quick-connect by ID, card grid (RustDesk-inspired layout), list toggle, 30s auto-sync, panel branding/fonts/colors. Devices → Web Remote unchanged.
+- **RdClient login (web):** `/remote/login` — dedicated operator sign-in when the panel session expires (redirects to `/remote` or viewer instead of admin `/login`); optional **Remember me** stores encrypted credentials in IndexedDB (Web Crypto AES-GCM), separate from the peer password vault planned for Phase B.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.16] — 2026-06-14
+
+### Changed
+
+- **Go server (performance):** batch peer lookup via `GetPeersByIDs` for address book merge and scoped RustDesk peer lists (avoids N+1 `GetPeer` queries on large fleets).
+- **Go server (performance):** SQL pagination for admin `GET /api/peers?limit=&page=`; scoped RustDesk device groups reuse batched peer loading.
+- **Go server (billing):** stale pending relay metadata is swept after 10 minutes when pairing never completes.
+- **Go server (relay):** fix pairing race when both sides connect simultaneously (LoadOrStore instead of LoadAndDelete+Store).
+- **Go server (signal):** two-phase `CheckHeartbeats` shortens peer-map write lock during heartbeat sweeps.
+- **Go server (observability):** `/api/health` and `/metrics` expose live peer tiers, relay sessions, and billing pending relay count.
+
+### Added
+
+- **Go server (compat):** integration test covering signal relay assignment through hbbr byte relay (`TestSignalRelayWireFlow`).
+- **Go server (tests):** relay pairing tests wait for `ActiveSessions` instead of a fixed sleep.
+- **Go server (DB):** `ListPeersPaginated` / `ListPeersForOrgPaginated` for large fleet admin views.
+
+---
+
+## [3.3.15] — 2026-06-14
+
+### Changed
+
+- **Go server (stability):** CDAP disconnect cleans all session types (terminal, video, file, audio, desktop); batch peer status DB updates on mass offline; known-peer heartbeats skip registration rate limiter; relay WebSocket uses same per-IP ConnLimiter as TCP; Postgres query timeouts on status updates; org login rate limiting.
+- **CI:** `go-server-ci.yml` runs `go vet` and `go test -race` on changes under `betterdesk-server/`.
+
+---
+
+## [3.3.14] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.13] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.12] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.11] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.10] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.9] — 2026-06-14
+
+### Added
+
+- **Settings → Appearance (branding):** Modular studio layout with live preview panel, autosave, server-side appearance profiles, built-in theme gallery, Google Fonts picker (expanded catalog), custom font upload (woff2/ttf), and dynamic branding CSS at `/css/branding.css` (fixes theme overrides not applying when static `theme.css` took precedence).
+
+### Changed
+
+- **Appearance tab:** Changes apply without full page reload; optional “preview on this page” toggle; read-only mode when the user lacks `branding.edit`.
+
+---
+
+## [3.3.8] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.7] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.6] — 2026-06-14
+
+### Added
+
+- **Email notifications:** SMTP configuration moved to **Settings → Email** (host, credentials, from address, alert/warning email). Each panel user can have an **email address** in User Management (used for routing notifications).
+- **Help request emails:** When a device submits a help request, operators assigned to the device **folder or device group** receive an email (configurable under **Commercialization → Advanced settings**). Falls back to the alert email when no operator address is available. Requires `nodemailer` (now a declared dependency).
+
+### Changed
+
+- **Automation:** SMTP tab removed; use **Settings → Email** instead. Legacy `/api/automation/smtp*` endpoints still proxy to the shared SMTP handlers for one release cycle.
+- **Console layout:** Main content now uses the full workspace width (removed the 1400px cap on all panel pages). Device details open as a large workspace modal between the sidebar and the right edge instead of a 640px slide-over from the viewport edge.
+
+---
+
+## [3.3.5] — 2026-06-14
+
+### Changed
+
+- **License (stable):** **v3.4.0** will be the first stable release under **AGPL-3.0** (already in effect on `dev` since v3.3.3). v3.3.x and earlier remain Apache 2.0.
+
+---
+
+## [3.3.4] — 2026-06-14
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.3] — 2026-06-13
+
+### Changed
+
+- **License:** The project transitions to **AGPL-3.0** on the development branch. **v3.4.0** will be the first stable release under AGPL-3.0; **v3.3.x and earlier** remain under Apache 2.0. See [docs/COMMERCIAL-GRANT.md](docs/COMMERCIAL-GRANT.md) for sponsor terms.
+- **i18n:** French (`fr.json`) and Traditional Chinese (`zh-TW.json`) translations were withdrawn and recreated by the maintainer under AGPL-3.0.
+
+---
+
+## [3.3.2] — 2026-06-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.3.1] — 2026-06-12
+
+Patch release on `main`. Ships via **Settings → Updates** (Stable), `betterdesk.sh` option 2, or replace `betterdesk.sh` from tag `v3.3.1`.
+
+### Fixed
+
+- **`betterdesk.sh` syntax error on Linux (#199)** — removed orphan `fi` in `update_from_github()` (line 3405) that broke `./betterdesk.sh` on v3.3.0 fresh clone and after self-update.
+- **Update via `betterdesk.sh` (#198)** — existing installs no longer show the misleading “Creating admin user” / PANEL LOGIN CREDENTIALS banner; post-update path runs console permission sync and `systemctl reset-failed` before restart; panel health check uses HTTPS/custom `PORT` (not hard-coded `:5000`).
+
+### Upgrade notes
+
+| Topic | Action |
+|-------|--------|
+| **Broken 3.3.0 script** | Update to 3.3.1+ or once: remove the extra `fi` at line 3405, or copy `betterdesk.sh` from tag `v3.3.1`, then re-run Update. |
+| **Verify** | `bash -n ./betterdesk.sh`; after update: `systemctl is-active betterdesk-console`; log in with your existing admin password. |
+
+---
+
+## [3.3.0] — 2026-06-12
+
+Stable production release on `main` (merged from `dev`). Ships via **Settings → Updates** on the **Stable** channel, or `betterdesk.sh` / `betterdesk.ps1` option 2 / `docker compose pull` for GHCR. Panel update creates a pre-update backup by default. No database migration or manual SQL step is required.
+
+### Added
+
+- **Organization shared address book (#190)** — admins maintain a shared contact list per organization (Organizations → Address Book). Entries merge into each member's RustDesk address book on `GET /api/ab` when sharing is enabled; personal entries stay private.
+- **Organizations → Device Groups tab** — readout of device groups and user groups linked to the organization (`team_id`), with shortcuts to Devices → Groups and one-click org-scoped group creation.
+- **Docker MACVLAN quick-start (#186)** — `docker-compose.quick.macvlan.yml` plus upgrade notes in [DOCKER_QUICKSTART.md](docs/docker/DOCKER_QUICKSTART.md). Uses `service_started` (not `service_healthy`) and `127.0.0.1` API/WS env when the console uses `network_mode: service:server`.
+- **`betterdesk-show-admin-credentials` helper (#195)** — re-execs as `betterdesk` to read `.admin_credentials` on hardened images (`cap_drop: ALL`). Bundled in all Docker images; documented in README, install.sh, and Docker troubleshooting.
+
+### Fixed
+
+- **Stale update warning banner (#192)** — Settings → Updates no longer keeps showing stale `EACCES` errors after a successful external update (`betterdesk.sh`, `betterdesk.ps1`, `betterdesk-docker.sh`, or GHCR `docker compose pull`). Non-critical root-owned file failures are filtered; the banner clears when the installed SHA matches the target. Native install/update now copies `VERSION` into the console directory (Settings reads semver from `VERSION` or `package.json`).
+- **CodeQL / security hardening** — OIDC discovery blocks private/link-local DNS; branding SVG/CSS multi-pass sanitization; same-origin restrictions on desktop iframe routes and `Utils.api()`; confined filesystem helpers; upload rate limits; type-safe device file API parsing. CodeQL config documents intentional exclusions.
+- **Go server product version in Docker builds** — `BETTERDESK_PRODUCT_VERSION` build arg embeds semver in the Go binary (Settings → Server Information matches panel version after image update).
+
+### Changed
+
+- Alpha desktop clients (`betterdesk-mgmt`, `betterdesk-agent-client`) temporarily untracked from git to reduce Dependabot / CI noise.
+- Version bump automation uses `scripts/bump-version.js --list-paths` (includes Go server VERSION files and MACVLAN compose).
+
+### Upgrade notes (operators)
+
+| Topic | Action |
+|-------|--------|
+| **Native / panel update** | Settings → Updates → Stable → Check for updates → Install. Allow Go server rebuild/restart when prompted. |
+| **Docker** | `docker compose pull && docker compose up -d` after release; use `betterdesk-show-admin-credentials` instead of `cat` as root. |
+| **MACVLAN (#186)** | Switch to `docker-compose.quick.macvlan.yml` or set `depends_on: service_started`, `DB_PATH=/app/data/db_v2.sqlite3`, `127.0.0.1` for API/WS. |
+| **Stale update banner (#192)** | Update to 3.3.0+ or once: `rm -f <console-path>/data/.last_update_result.json` and restart console. |
+
+---
+
+## [3.2.20] — 2026-06-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.19] — 2026-06-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.18] — 2026-06-12
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.17] — 2026-06-12
+
+### Fixed
+- **Docker admin credential lookup (#195)** — `docker compose exec` as root could not read `.admin_credentials` (mode 0600) on hardened images (`cap_drop: ALL`). Added `betterdesk-show-admin-credentials` helper (re-execs as `betterdesk`); updated README, quick-start compose comments, `install.sh`, and Docker docs. Existing installs without the helper can use `docker compose exec -u betterdesk console …`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.16] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.15] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.14] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.13] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.12] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.11] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.10] — 2026-06-11
+
+### Fixed
+- **CodeQL / security scan hardening** — OIDC discovery fetch blocks private/link-local DNS targets; branding SVG/CSS sanitization uses stable multi-pass stripping; desktop iframe routes and client `Utils.api()` restricted to same-origin paths; confined filesystem helpers for backups/server file browser/i18n; unbiased password generation; upload rate limits on tickets/languages/file-transfer; type-safe device file API body parsing. CodeQL config excludes dev-only scripts and documents intentional RustDesk wire-protocol hashes.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.9] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.8] — 2026-06-11
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.7] — 2026-06-11
+
+### Fixed
+- **Stale update warning on script / Docker paths (#192)** — `betterdesk.ps1` and `betterdesk-docker.sh` now clear `data/.last_update_result.json` when syncing `.update_sha` after a successful external update (parity with `betterdesk.sh`). GHCR image deployments clear the same stale panel banner on console startup after `docker compose pull`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.6] — 2026-06-10
+
+### Fixed
+- **Docker MACVLAN quick-start (issue #186)** — Added `docker-compose.quick.macvlan.yml` and MACVLAN upgrade notes in `docs/docker/DOCKER_QUICKSTART.md`. Documents `service_started` (not `service_healthy`) and `127.0.0.1` API/WS env when the console uses `network_mode: service:server`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.5] — 2026-06-10
+
+### Fixed
+- **Panel update warning banner (#192)** — Settings → Updates no longer keeps showing stale `EACCES` errors after a successful `betterdesk.sh` update. Non-critical root-owned file failures (scripts, Dockerfiles, server source) are filtered out; the banner clears automatically when the installed SHA matches the update target.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.4] — 2026-06-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.3] — 2026-06-10
+
+### Added
+- **Organization shared address book** — admins can maintain a shared contact list per organization (Organizations → Address Book tab). Entries are merged into each member's RustDesk address book on `GET /api/ab` when sharing is enabled. Personal address book entries remain private and editable only by the logged-in user. Fixes [#190](https://github.com/UNITRONIX/BetterDesk/issues/190).
+
+### Changed
+- **Organizations → Device Groups tab** — replaced the manual JSON address book editor with a readout of device groups and user groups linked to the organization (`team_id`). Includes a shortcut to Devices → Groups and a one-click “Create device group” action scoped to the org.
+
+---
+
+## [3.2.2] — 2026-06-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.1] — 2026-06-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.2.0] — 2026-06-10
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.15] — 2026-06-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.14] — 2026-06-09
+
+Production release **3.2.0** (stable `main`). Ships via **Settings → Updates** on the **Stable** channel, or `betterdesk.sh` / `betterdesk.ps1` option 2. Panel update creates a pre-update backup by default. No database migration or manual SQL step is required.
+
+### Security
+
+- **CVE-2026-50575 / GHSA-3v82-3gf8-fxx8 (device replay after delete)** — WebSocket signal registration now rejects soft-deleted peer IDs (new registration and heartbeat), matching UDP/TCP. `UpdatePeerStatus` no longer marks soft-deleted rows `ONLINE`. Restoration is explicit only via `POST /api/peers/{id}/restore` or the Devices UI. Requires **`betterdesk-server`** update (panel rebuild/redeploy when Go sources change).
+- **Dependency updates** — `go-ntlmssp` 0.1.1 (CVE-2026-32952), `golang.org/x/image` 0.38.0 (CVE-2026-33809), `pgx/v5` 5.9.2 in Go modules; `openssl` 0.10.80 and `tauri` 2.11.2 in Tauri `Cargo.lock` (**desktop client rebuild required** for Rust-side fixes; server/console panel update alone is not enough for desktop).
+- **Go API proxy hardening** — shared `goApiProxy.js` validates path segments on fleet, commercialization, and cross-platform routes; ID guards on all proxy routes; blocks path-smuggling while accepting RustDesk peer IDs (`a-zA-Z0-9_-`).
+- **Go API SSRF guard** — `goApiPath` validates relative paths on the `betterdeskApi` client; policy routes validate org/device IDs; help-request IDs validated before proxying to Go.
+- **XSS** — `cross-platform.js`, `users.js`, `dataguard.js`, `cdap-studio.js` escape/sanitize dynamic HTML and CSS class names.
+- **Path confinement** — shared `safePath` for backup deletion, i18n language files, server file browser, `fontService`, and `fileTransferService` (symlink-aware root checks). File browser respects `BETTERDESK_FILE_ALLOWED_ROOTS`.
+- **SSRF / shell hardening** — OIDC discovery URLs validated before fetch; network monitor HTTP/TCP checks use validated hostname/port/path; terminal proxy restricted to known system shell paths; `updateService` and deploy helpers use `execFileSync` argv arrays; `linux-ensure-console-user.js` uses `execFileSync`.
+- **Clear-text logging** — admin password no longer logged on first install; API login logs redact usernames (`logRedact.js`); admin self-test password cleared after use in `authService`.
+- **Audit log** — `Recent` / `RecentByAction` clamp `n` to 500 to limit allocation.
+- **CI** — `build.yml` default `permissions: contents: read`; write only on release/binary-update jobs.
+
+### Fixed
+
+- **RBAC** — deleting the last `super_admin` / legacy admin is blocked (HTTP 409), aligned with update/demotion guards; org owner label shown as **Org Admin** in all 26 locales.
+- **Panel update (dev channel)** — repair step no longer re-downloads removed `web-nodejs/scripts/*` paths (404 false failures after dev-only i18n toolkit move).
+- **Console update channel UX** — `Modal.confirm` for channel switch dialog; clearer Stable / Development labels and Docker update UI strings in all locales.
+- **Go server deploy (Linux panel)** — privileged Go server binary deploy from the Linux panel (hotfix already on `main`).
+
+### Added
+
+- **One-line Linux installer (`install.sh`)** — `curl -fsSL …/install.sh | sudo bash` for automated Docker quick-start (engine install when missing, compose download with validation, relay IP detection, firewall rules, health wait, credential summary). Use `--native` for git clone + `betterdesk.sh --auto`, or `--uninstall` / `--purge` to tear down the Docker stack.
+
+### Changed
+
+- **i18n dev toolkit** moved to `web-nodejs/scripts/dev-i18n/` — not deployed to production consoles; one-shot `patch-*` scripts removed (recoverable from git history).
+- **Update channel switcher** — stable vs development channel selection in Settings → Updates (production servers should stay on Stable).
+
+### Upgrade notes (operators)
+
+| Topic | Action |
+|-------|--------|
+| **Native / panel update** | Settings → Updates → Stable → Check for updates → Install. Allow Go server rebuild/restart when prompted. |
+| **Docker** | Pull new GHCR tags after release (`docker compose pull && docker compose up -d`); in-app GitHub install is disabled in container mode. |
+| **Soft-deleted devices** | Do not expect deleted peers to self re-register over WebSocket; use **Restore** in Devices if intentional. |
+| **Custom file paths** | If file browser or font upload breaks, review `BETTERDESK_FILE_ALLOWED_ROOTS` in console `.env`. |
+| **Desktop client (Tauri)** | Rebuild/reinstall desktop agent after this release to pick up `openssl` / `tauri` lockfile fixes. |
+| **Rollback** | Use the automatic pre-update backup from Settings → Updates, or restore from your own snapshot. |
+
+### Verify after update
+
+1. Panel login and dashboard load.
+2. Settings → Updates shows current version; no repair 404 errors.
+3. Devices list and one test remote session.
+4. Optional: delete-user guard — last admin cannot be removed (409).
+5. Docker operators: confirm new image tag on GHCR matches `v3.2.0`.
+
+---
+
+## [3.1.13] — 2026-06-09
+
+### Fixed
+- **RBAC** — deleting the last `super_admin` is blocked (409), aligned with update/demotion guards; org owner label shown as Org Admin in all locales.
+- **Panel update (dev channel)** — repair step no longer re-downloads removed `web-nodejs/scripts/*` paths (404 false failures).
+- **Console update channel UX** — `Modal.confirm` for channel switch dialog; clearer stable/dev labels.
+
+### Security
+- **CVE-2026-50575 / GHSA-3v82-3gf8-fxx8 (device replay after delete)** — WebSocket signal registration rejects soft-deleted peer IDs; `UpdatePeerStatus` no longer marks soft-deleted rows `ONLINE`. Restoration via `POST /api/peers/{id}/restore` only. Ships via panel update (`betterdesk-server`).
+- **Dependency updates** — `go-ntlmssp` 0.1.1 (CVE-2026-32952), `golang.org/x/image` 0.38.0 (CVE-2026-33809), `pgx/v5` 5.9.2; `openssl` 0.10.80 and `tauri` 2.11.2 in Tauri `Cargo.lock` (desktop client rebuild required for Rust-side fixes).
+- **Go API proxy hardening (phases D–E)** — shared `goApiProxy.js` validates path segments on fleet, commercialization, and cross-platform routes; ID guards on all proxy routes; blocks path-smuggling while accepting RustDesk peer IDs.
+- **Go API SSRF guard** — `goApiPath` validates all relative paths on `betterdeskApi` axios client; policy routes validate org/device IDs; help-request IDs validated before proxying.
+- **XSS** — `cross-platform.js`, `users.js`, `dataguard.js`, `cdap-studio.js` escape/sanitize dynamic HTML and CSS class names.
+- **Path confinement (CodeQL)** — shared `safePath` helper for backup deletion, i18n language files, server file browser, `fontService`, and `fileTransferService` (symlink-aware root checks).
+- **SSRF / shell hardening** — OIDC discovery URLs validated before fetch; network monitor HTTP/TCP checks use validated components; terminal proxy restricted to known shell paths; `updateService` and deploy helpers use `execFileSync` argv arrays; `linux-ensure-console-user.js` uses `execFileSync`.
+- **Clear-text logging** — admin password no longer logged on first install; API login logs redact usernames (`logRedact.js`); admin self-test password cleared after use.
+- **Audit log** — `Recent` / `RecentByAction` clamp `n` to 500 to limit allocation (CodeQL).
+- **CI** — `build.yml` default `permissions: contents: read`; write only on release/binary-update jobs.
+
+### Changed
+- **i18n dev toolkit** moved to `web-nodejs/scripts/dev-i18n/` — not deployed to production; one-shot `patch-*` scripts removed (recoverable from git history).
+- **i18n** — Docker update UI strings and update-channel labels translated across all 26 locales.
+
+---
+
+## [3.1.12] — 2026-06-09
+
+### Fixed
+- **RBAC** — block deleting last `super_admin`; org owner label as Org Admin in all locales.
+
+---
+
+## [3.1.11] — 2026-06-09
+
+### Security
+- **Go API proxy hardening (phase E)** — shared `goApiProxy.js` validates path segments on fleet, commercialization, and cross-platform routes; blocks path-smuggling while accepting RustDesk peer IDs (numeric and `a-zA-Z0-9_-`).
+- **Help-request API** — `betterdeskApi` validates registration help IDs before proxying to Go.
+- **XSS** — `cross-platform.js`, `users.js`, `dataguard.js`, `cdap-studio.js` escape/sanitize dynamic HTML and CSS class names.
+- **Audit log** — `Recent` / `RecentByAction` clamp `n` to 500 to limit allocation (CodeQL).
+- **Clear-text logging** — admin self-test password cleared after use in `authService`.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.10] — 2026-06-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.9] — 2026-06-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.8] — 2026-06-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.7] — 2026-06-09
+
+### Security
+- **Go API SSRF guard** — `goApiPath` validates all relative paths on `betterdeskApi` axios client; policy routes validate org/device IDs.
+- **File browser** — directory listing uses `resolveChildPath` for each entry under an already-confined parent path.
+- **Clear-text logging** — admin password no longer logged on first install; API login logs redacted usernames (`logRedact.js`).
+- **Path confinement** — `fontService` and `fileTransferService` use `safePath.resolveChildPath` for filesystem operations.
+- **CI** — `build.yml` default `permissions: contents: read`; write only on release/binary-update jobs.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.6] — 2026-06-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.5] — 2026-06-09
+
+### Fixed
+- **Panel update (dev channel)** — after intentional removal of dev-only i18n scripts, the repair step no longer tries to re-download deleted `web-nodejs/scripts/*` paths (404 false failures).
+
+### Security
+- **Path confinement (CodeQL)** — shared `safePath` helper for backup deletion, i18n language files, and server file browser (symlink-aware root checks).
+- **i18n dev toolkit** moved to `web-nodejs/scripts/dev-i18n/` (`apply-i18n-audit`, `i18n-audit-data/`, `collect-gap-keys`, `generate-gap-fill`) — not deployed to production; one-shot feature `patch-*` scripts removed (recoverable from git history).
+- **SSRF hardening** — network monitor HTTP checks use `http.request` with validated hostname/port/path components.
+- **Terminal proxy** — login shells restricted to known system shell paths.
+- **Installer scripts** — `linux-ensure-console-user.js` uses `execFileSync` argv arrays instead of shell strings.
+- **OIDC discovery** — HTTP fetch uses validated URL string after SSRF checks.
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.4] — 2026-06-09
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.3] — 2026-06-09
+
+### Security
+- **CVE-2026-50575 / GHSA-3v82-3gf8-fxx8 (device replay after delete)** — WebSocket signal registration now rejects soft-deleted peer IDs (new registration and heartbeat), matching the existing UDP/TCP path. `UpdatePeerStatus` no longer marks soft-deleted rows `ONLINE`. Restoration remains explicit via `POST /api/peers/{id}/restore` only. Ships via panel update (`betterdesk-server`).
+- **Dependency updates (Dependabot)** — `go-ntlmssp` 0.1.1 (CVE-2026-32952), `golang.org/x/image` 0.38.0 (CVE-2026-33809), `pgx/v5` 5.9.2 in Go modules; `openssl` 0.10.80 and `tauri` 2.11.2 in Tauri `Cargo.lock` files (desktop client rebuild required for Rust-side fixes).
+- **SSRF / path hardening (CodeQL)** — OIDC discovery URLs validated before fetch; language file routes confined to `lang/`; server file browser paths restricted to allowed roots (`BETTERDESK_FILE_ALLOWED_ROOTS`); network monitor TCP checks resolve DNS before connect; address-book tag merge capped to prevent allocation overflow.
+- **Shell / logging hardening** — `updateService` and deploy helpers use `execFileSync` argv arrays; auth audit logs no longer echo operator usernames on sensitive paths; system log/stats routes rate-limited.
+
+---
+
+## [3.1.2] — 2026-06-08
+
+### Added
+- **One-line Linux installer (`install.sh`)** — `curl -fsSL …/install.sh | sudo bash` performs a fully automated Docker quick-start (Docker engine install when missing, compose download with validation, relay IP detection, firewall rules, health wait, credential summary). Use `--native` for git clone + `betterdesk.sh --auto`, or `--uninstall` / `--purge` to tear down the Docker stack.
+
+---
+
+## [3.1.1] — 2026-06-08
+
+### Changed
+- _(none yet)_
+
+---
+
+## [3.1.0] — 2026-06-07
+
+### Changed
+- _(none yet)_
+
+---
+
+# Changelog
+
+All notable changes to this project are documented here.
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+---
+
+## [3.0.1] — 2026-06-07 — Security hardening (2026-04-26)
+
+### Added
+- **Czech console translation completed** — `web-nodejs/lang/cs.json` now contains Czech UI text instead of the previous English fallback content and has the correct `meta.lang` value. Community contribution by [Karel Lowprize K](https://github.com/lowprize) ([PR #133](https://github.com/UNITRONIX/BetterDesk/pull/133)).
+- **RustDesk PRO group endpoint stubs** — `betterdesk-server/api/server.go` now exposes `GET /api/group`, `GET|POST /api/group/get`, and `GET /api/peers/list` returning the `{total, data, msg}` envelope expected by RustDesk Flutter clients. Without these endpoints the Flutter UI aborted device-list loading and never fell back to address-book mode. Idea credit: [progloto](https://github.com/progloto) ([PR #81](https://github.com/UNITRONIX/BetterDesk/pull/81)).
+- **Catch-all 404 logging** — Both `betterdesk-server/api/server.go` (Go API) and `web-nodejs/server.js` (RustDesk-compatible API + main panel) now log unmatched routes with method, path, client IP, and User-Agent. Makes missing client-compatibility endpoints easy to spot during deployments. Diagnostics suggestion credit: [progloto](https://github.com/progloto) ([PR #81](https://github.com/UNITRONIX/BetterDesk/pull/81)).
+- **Defensive list parsing in panel** — `web-nodejs/services/betterdeskApi.js` and `web-nodejs/public/js/devices.js` already accepted both `[…]` and `{ peers: […] }` shapes; this stays unchanged so admin UI works regardless of which endpoint envelope a future RustDesk version returns.
+
+### Changed
+- **Docker quick-start admin credential lookup** — README and `docker-compose.quick.yml` now point users to the secure `.admin_credentials` file shared with the console container instead of grepping logs that do not reliably contain the generated password. Documentation suggestion by [Karel Lowprize K](https://github.com/lowprize) ([PR #134](https://github.com/UNITRONIX/BetterDesk/pull/134)).
+
+### Fixed
+- **Live device-status updates on the Devices page** — The WebSocket status handler now updates the current device state array and visible status badge without referencing a stale `allDevices` variable. This was found while reviewing Rafael Monteiro's heartbeat/status contribution ([PR #35](https://github.com/UNITRONIX/BetterDesk/pull/35)).
+- **RustDesk WSS rendezvous timeout behind reverse proxies** — The Go signal WebSocket endpoint now sends RustDesk-compatible empty binary keepalive frames and ignores empty keepalive replies from clients. This prevents `Rendezvous connection is timeout` after a successful WSS handshake when Nginx proxies `/ws/id` to port `21118`. Reported by [odixz](https://github.com/odixz) ([#144](https://github.com/UNITRONIX/BetterDesk/issues/144)).
+- **RustDesk WSS peer cleanup after keepalive** — Empty RustDesk WebSocket keepalive replies now refresh the in-memory peer heartbeat, preventing the signal server from marking an active WSS peer offline after the 30-second cleanup window. Follow-up logs and retest by [odixz](https://github.com/odixz) ([#144](https://github.com/UNITRONIX/BetterDesk/issues/144)).
+
+### Security
+- **Brute-force protection on RustDesk client API** — `web-nodejs/routes/rustdesk-api.routes.js` now `await`s `authService.checkBruteForce(...)`. Previously the async result was treated as truthy/undefined, making the lockout effectively unenforceable on the RustDesk-compatible login route. (Audit finding #1, High)
+- **TOTP login session fixation** — `web-nodejs/routes/auth.routes.js` regenerates the session via `req.session.regenerate(...)` after successful 2FA verification, mirroring the standard login flow. Previously the pre-2FA session ID was reused for the post-2FA authenticated session. Cookie name is unchanged; existing browser sessions continue to work. (Audit finding #2, Medium)
+- **Audit endpoints now require explicit RBAC** — `betterdesk-server/api/server.go` wraps `GET /api/audit/events` and `GET /api/ws/events` in `requirePermission(auth.PermAuditView, ...)`. All built-in roles that previously consumed these endpoints (`super_admin`, `admin`, `server_admin`, `global_admin`, `operator`, `viewer`) already grant `audit.view` by default — no behavioural change for them. **Behavioural change:** the `pro` role no longer receives `200` from these endpoints (it never had `audit.view` in `DefaultRolePermissions`). If a deployment relied on this implicit access, grant `audit.view` explicitly via the role-permission overrides table. (Audit finding #3, Medium)
+- **Generic 500 responses from Go auth handlers** — `betterdesk-server/api/auth_handlers.go` no longer leaks `err.Error()` strings on 9 internal-server-error paths (list/update/delete users, TOTP setup/confirm/disable, list/create/delete API keys). Full error detail is now logged server-side via `log.Printf`. Status codes and non-500 responses are unchanged. (Audit finding #4, Medium)
+
+### Deferred
+- Plaintext storage of RustDesk client access tokens (audit finding #5) and CSP `'unsafe-inline'`/`'unsafe-eval'` exceptions (audit finding #6) are intentionally **not** included in this batch. They require a phased rollout that would otherwise break existing installations or active client sessions. Tracked in [docs/security/LOGIN_API_SECURITY_AUDIT_2026-04-26.md](docs/security/LOGIN_API_SECURITY_AUDIT_2026-04-26.md#deferred-patches).
+
+---
+
+## [3.0.0] — 2026-06-07
+
+### Fixed
+- **SQLite auth.db upgrade crash (issue #158)** — Console startup no longer fails with `SqliteError: no such column: token_hash` on existing `auth.db` volumes. The `token_hash` column and index are now added before any index DDL runs; legacy access tokens are backfilled with SHA-256 hashes on first boot.
+- **Docker image version display** — Container entrypoints and image labels now report **3.0.0** (via `BETTERDESK_IMAGE_VERSION` at build time).
+
+### Changed
+- **Docker quick-start default image tag** — `docker-compose.quick.yml` pins `ghcr.io/unitronix/betterdesk-{server,console}:3.0.0` instead of `3.0.0-alpha`.
+
+---
+
+## [3.0.0-alpha] — 2026-04-01
+
+### Added
+- **Organization & User Account System** — Multi-tenant organizations with owner/admin/operator/user roles (Go server + Node.js panel)
+- **Organization REST API** — 18 endpoints for CRUD orgs, users, devices, invitations, settings, login
+- **Client Organization Login** — `OrgLoginPanel.tsx` with server address + username/password
+- **mDNS/DNS-SD Discovery** — Auto-discover BetterDesk servers on LAN (`_betterdesk._tcp`)
+- **Desktop Widget UI Overhaul** — New window management, taskbar redesign, wallpaper picker with tabs
+- **Chat 2.0** — Operator↔device group chat, E2E encryption (ECDH + AES-256-GCM), read receipts, file sharing, typing indicators
+- **Web Remote File Transfer** — Browser-based bidirectional file transfer with drag-and-drop, progress tracking, resume, history
+- **Security Hardening** — Organization-scoped policies (password, session, IP whitelist, device enrollment, 2FA, data retention)
+- **Fleet Management** — Device groups with tags, batch operations (restart, update, lock, wipe), cascading deletion
+- **Scaling Infrastructure** — Load balancer health checks, horizontal scaling config, region-aware relay selection
+- **Cross-Platform Support** — Platform detection, feature matrix, capabilities API per OS/browser
+- **Security Audit Module** — Built-in scanner with 8 check categories, compliance scoring, scheduled scans, PDF/JSON/CSV reports
+- **i18n Expansion** — 25+ languages (auto-discovery), Language Management admin page, `i18n:check` script with `--fix` mode
+- **Device Resource Control** — USB, optical drive, monitor, disk, quota policy management per device
+- **CDAP Documentation** — Protocol spec, agent guide, bridge guide, API reference (5 docs)
+- **SDK Documentation** — Python + Node.js SDK reference, integration examples, studio guide (5 docs)
+- **Pre-Release Checklist** — 8-section validation checklist for releases
+- **Docker SBOM + Trivy** — SBOM generation and vulnerability scanning in CI
+- **6 New Console Languages** — German, Spanish, French, Italian, Dutch, Portuguese
+- **3 High-Priority Languages** — Japanese, Korean, Chinese (Simplified)
+- **12 Additional Languages** — Arabic, Hebrew, Ukrainian, Turkish, Hindi, Swedish, Norwegian, Danish, Finnish, Czech, Hungarian, Romanian, Thai, Vietnamese, Indonesian
+- **Desktop Client i18n Framework** — `src/lib/i18n.ts` with `t()` function, plural forms, locale detection
+- **NSIS Multilingual Installer** — 12 languages in NSIS language selector
+- **Light Theme** — `themes/light.json` with WCAG-compliant light colors
+- **Theme API** — `GET /api/settings/themes`, `POST /api/settings/themes/:id/apply`
+- **Page Transition Animations** — `transitions.css` with page enter/exit, stagger, skeleton loading
+- **GitHub Actions: Client Releases** — Multi-platform Tauri builds (Windows/Linux/macOS)
+- **GitHub Actions: Server Releases** — Go cross-compile (linux-amd64/arm64, windows-amd64)
+- **Security Documentation** — THREAT_MODEL.md, ENCRYPTION_SPEC.md, COMPLIANCE.md, AUDIT_LOG.md
+- **Responsible Disclosure Policy** — `.github/SECURITY.md`
+- **Web Remote Toolbar** — Scale mode selector, monitor switcher, clipboard sync, special keys menu
+- **Fullscreen Mode** — F11 keyboard shortcut + button toggle
+- **Bidirectional Clipboard** — `navigator.clipboard` API integration in remote viewer
+- **Special Keys Menu** — Ctrl+Alt+Del, Win, PrintScreen, Alt+Tab, Alt+F4, Task Manager
+- **Beta Banner** — Replaced WIP banner with slim dismissible beta indicator
+
+### Changed
+- **CSP Headers Hardened** — Added `frame-ancestors`, `worker-src`, `child-src`; expanded Permissions-Policy
+- **X-Frame-Options** — Changed from `DENY` to `SAMEORIGIN` for desktop widget embed mode
+- **WebSocket CSP** — Added `ws:` to `connect-src` for HTTP mode (was missing)
+- **Cross-Origin Resource Policy** — Enabled `same-origin` (was disabled)
+
+### Fixed
+- **Chat: Tray opens wrong window** — Tray "Chat" now opens dedicated chat WebviewWindow directly
+- **Chat: Shows "Disconnected"** — WebSocket URL now uses dynamic `ws://`/`wss://` based on console_url
+- **Rust warnings** — All 10 compilation warnings fixed (unused imports, variables, labels)
+- **Go warnings** — `go vet` clean, 0 issues
+
+---
+
+## [2.4.0] — 2026-03-21
+
+### Added
+- **PostgreSQL Support** — Full PostgreSQL database backend for Go server and Node.js console
+- **SQLite → PostgreSQL Migration** — Built-in migration tool (menu option M/P)
+- **CDAP v0.3.0** — Widget rendering, device detail page, REST API, 8 widget types
+- **Native BetterDesk Agent** — Go binary for system management, 14 flags, 9 widgets
+- **Bridge SDK** — Python + Node.js SDKs for CDAP bridges (Modbus, SNMP, REST)
+- **Device Revocation** — `DELETE /api/peers/{id}?revoke=true&cascade=true`
+- **Peer Metrics** — `peer_metrics` table, `GET /api/peers/{id}/metrics`
+- **CDAP Audio** — Bidirectional audio streaming via WebSocket
+- **Devices Page Redesign** — Horizontal folder chips, kebab menu, responsive layout
+- **Docker GHCR** — Pre-built images on GitHub Container Registry
+
+### Fixed
+- **Empty UUID in Relay** — Generate UUID when `RequestRelay{uuid=""}` received
+- **ForceRelay TCP UUID Mismatch** — Return `PunchHoleResponse` instead of `RelayResponse`
+- **Docker Port 5000 Conflict** — Added `SIGNAL_PORT` env var, priority over `PORT`
+- **PS1 RandomNumberGenerator Crash** — Replaced .NET 6+ method with .NET 4.x compatible
+- **API TLS Breaking Clients** — Separated `--tls-api` flag from signal/relay TLS
+- **PostgreSQL Config Lost on Update** — Added `preserve_database_config()` function
+- **Auth.db Destroyed on Update** — Detect existing `.env` as UPDATE indicator
+- **Address Book Sync** — Real `address_books` table replacing stub handlers
+- **Settings Password** — Fixed snake_case vs camelCase field name mismatch
+
+---
+
+## [2.3.0] — 2026-02-17
+
+### Added
+- **CSRF Protection** — Double-submit cookie pattern with `csrf-csrf`
+- **TOTP 2FA** — Two-factor authentication with `otplib`
+- **RustDesk Client API** — Dedicated WAN-facing port 21121 with 7-layer security
+- **Address Book Sync** — Full AB storage with `address_books` table
+- **Operator Role** — Admin/operator role separation with different permissions
+- **SSL Certificate Configuration** — New menu option C in installer scripts
+- **Desktop Connect Button** — Connect to devices from browser via RustDesk URI handler
+
+### Fixed
+- **Session Fixation** — Session regeneration after login
+- **Timing-Safe Auth** — Pre-computed dummy bcrypt hash for non-existent users
+- **WebSocket Auth** — Session cookie required for upgrade
+- **Web Remote Client** — 5 Critical, 2 High, 3 Low bugs fixed
+
+---
+
+## [2.2.0] — 2026-02-06
+
+### Added
+- **Node.js Console** — Express.js web console replacing Flask
+- **Migration Tool** — Migrate between console types
+- **Automatic Node.js Installation** — Installer detects and installs Node.js
+
+---
+
+## [2.1.0] — 2026-02-04
+
+### Added
+- **Go Server** — Single binary replacing hbbs + hbbr (~20K LOC)
+- **ALL-IN-ONE Scripts** — `betterdesk.sh` + `betterdesk.ps1` + `betterdesk-docker.sh`
+- **Automatic Mode** — `--auto` flag for non-interactive installation
+- **SHA256 Verification** — Automatic checksum verification of binaries
+
+---
+
+[3.0.0]: https://github.com/UNITRONIX/BetterDesk/compare/v3.0.0-alpha...v3.0.0
+[3.0.0-alpha]: https://github.com/UNITRONIX/BetterDesk/compare/v2.4.0...v3.0.0-alpha
+[2.4.0]: https://github.com/UNITRONIX/BetterDesk/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/UNITRONIX/BetterDesk/compare/v2.2.0...v2.3.0
+[2.2.0]: https://github.com/UNITRONIX/BetterDesk/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/UNITRONIX/BetterDesk/releases/tag/v2.1.0
+[3.0.1]: https://github.com/UNITRONIX/BetterDesk/compare/v3.0.0...v3.0.1
+[3.1.0]: https://github.com/UNITRONIX/BetterDesk/compare/v3.0.1...v3.1.0
+[3.1.1]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.0...v3.1.1
+[3.1.2]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.1...v3.1.2
+[3.1.3]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.2...v3.1.3
+[3.1.4]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.3...v3.1.4
+[3.1.5]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.4...v3.1.5
+[3.1.6]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.5...v3.1.6
+[3.1.7]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.6...v3.1.7
+[3.1.8]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.7...v3.1.8
+[3.1.9]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.8...v3.1.9
+[3.1.10]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.9...v3.1.10
+[3.1.11]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.10...v3.1.11
+[3.1.12]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.11...v3.1.12
+[3.1.13]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.12...v3.1.13
+[3.1.14]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.13...v3.1.14
+[3.1.15]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.14...v3.1.15
+[3.2.0]: https://github.com/UNITRONIX/BetterDesk/compare/v3.1.15...v3.2.0
+[3.2.1]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.0...v3.2.1
+[3.2.2]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.1...v3.2.2
+[3.2.3]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.2...v3.2.3
+[3.2.4]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.3...v3.2.4
+[3.2.5]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.4...v3.2.5
+[3.2.6]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.5...v3.2.6
+[3.2.7]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.6...v3.2.7
+[3.2.8]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.7...v3.2.8
+[3.2.9]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.8...v3.2.9
+[3.2.10]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.9...v3.2.10
+[3.2.11]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.10...v3.2.11
+[3.2.12]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.11...v3.2.12
+[3.2.13]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.12...v3.2.13
+[3.2.14]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.13...v3.2.14
+[3.2.15]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.14...v3.2.15
+[3.2.16]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.15...v3.2.16
+[3.2.17]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.16...v3.2.17
+[3.2.18]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.17...v3.2.18
+[3.2.19]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.18...v3.2.19
+[3.2.20]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.19...v3.2.20
+[3.3.0]: https://github.com/UNITRONIX/BetterDesk/compare/v3.2.20...v3.3.0
+[3.3.1]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.0...v3.3.1
+[3.3.2]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.1...v3.3.2
+[3.3.3]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.2...v3.3.3
+[3.3.4]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.3...v3.3.4
+[3.3.5]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.4...v3.3.5
+[3.3.6]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.5...v3.3.6
+[3.3.7]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.6...v3.3.7
+[3.3.8]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.7...v3.3.8
+[3.3.9]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.8...v3.3.9
+[3.3.10]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.9...v3.3.10
+[3.3.11]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.10...v3.3.11
+[3.3.12]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.11...v3.3.12
+[3.3.13]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.12...v3.3.13
+[3.3.14]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.13...v3.3.14
+[3.3.15]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.14...v3.3.15
+[3.3.16]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.15...v3.3.16
+[3.3.17]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.16...v3.3.17
+[3.3.18]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.17...v3.3.18
+[3.3.19]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.18...v3.3.19
+[3.3.20]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.19...v3.3.20
+[3.3.21]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.20...v3.3.21
+[3.3.22]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.21...v3.3.22
+[3.3.23]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.22...v3.3.23
+[3.3.24]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.23...v3.3.24
+[3.3.25]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.24...v3.3.25
+[3.3.26]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.25...v3.3.26
+[3.3.27]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.26...v3.3.27
+[3.3.28]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.27...v3.3.28
+[3.3.29]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.28...v3.3.29
+[3.3.30]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.29...v3.3.30
+[3.3.31]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.30...v3.3.31
+[3.3.32]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.31...v3.3.32
+[3.3.33]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.32...v3.3.33
+[3.3.34]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.33...v3.3.34
+[3.3.35]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.34...v3.3.35
+[3.3.36]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.35...v3.3.36
+[3.3.37]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.36...v3.3.37
+[3.3.38]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.37...v3.3.38
+[3.3.39]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.38...v3.3.39
+[3.3.40]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.39...v3.3.40
+[3.3.41]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.40...v3.3.41
+[3.3.42]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.41...v3.3.42
+[3.3.43]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.42...v3.3.43
+[3.3.44]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.43...v3.3.44
+[3.3.45]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.44...v3.3.45
+[3.3.46]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.45...v3.3.46
+[3.3.47]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.46...v3.3.47
+[3.3.48]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.47...v3.3.48
+[3.3.49]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.48...v3.3.49
+[3.3.50]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.49...v3.3.50
+[3.3.51]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.50...v3.3.51
+[3.3.52]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.51...v3.3.52
+[3.3.53]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.52...v3.3.53
+[3.3.54]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.53...v3.3.54
+[3.3.55]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.54...v3.3.55
+[3.3.56]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.55...v3.3.56
+[3.3.57]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.56...v3.3.57
+[3.3.58]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.57...v3.3.58
+[3.3.59]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.58...v3.3.59
+[3.3.60]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.59...v3.3.60
+[3.3.61]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.60...v3.3.61
+[3.3.62]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.61...v3.3.62
+[3.3.63]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.62...v3.3.63
+[3.3.64]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.63...v3.3.64
+[3.3.65]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.64...v3.3.65
+[3.3.66]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.65...v3.3.66
+[3.3.67]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.66...v3.3.67
+[3.3.68]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.67...v3.3.68
+[3.3.69]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.68...v3.3.69
+[3.3.70]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.69...v3.3.70
+[3.3.71]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.70...v3.3.71
+[3.3.72]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.71...v3.3.72
+[3.3.73]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.72...v3.3.73
+[3.3.74]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.73...v3.3.74
+[3.3.75]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.74...v3.3.75
+[3.3.76]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.75...v3.3.76
+[3.3.77]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.76...v3.3.77
+[3.3.78]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.77...v3.3.78
+[3.3.79]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.78...v3.3.79
+[3.3.80]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.79...v3.3.80
+[3.3.81]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.80...v3.3.81
+[3.3.82]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.81...v3.3.82
+[3.3.83]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.82...v3.3.83
+[3.3.84]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.83...v3.3.84
+[3.3.85]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.84...v3.3.85
+[3.3.86]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.85...v3.3.86
+[3.3.87]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.86...v3.3.87
+[3.3.88]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.87...v3.3.88
+[3.3.89]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.88...v3.3.89
+[3.3.90]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.89...v3.3.90
+[3.3.91]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.90...v3.3.91
+[3.3.92]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.91...v3.3.92
+[3.3.93]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.92...v3.3.93
+[3.3.94]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.93...v3.3.94
+[3.3.95]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.94...v3.3.95
+[3.3.96]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.95...v3.3.96
+[3.3.97]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.96...v3.3.97
+[3.3.98]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.97...v3.3.98
+[3.3.99]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.98...v3.3.99
+[3.3.100]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.99...v3.3.100
+[3.3.101]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.100...v3.3.101
+[3.3.102]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.101...v3.3.102
+[3.3.103]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.102...v3.3.103
+[3.3.104]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.103...v3.3.104
+[3.3.105]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.104...v3.3.105
+[3.3.106]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.105...v3.3.106
+[3.3.107]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.106...v3.3.107
+[3.3.108]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.107...v3.3.108
+[3.3.109]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.108...v3.3.109
+[3.3.110]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.109...v3.3.110
+[3.3.111]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.110...v3.3.111
+[3.3.112]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.111...v3.3.112
+[3.3.113]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.112...v3.3.113
+[3.3.114]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.113...v3.3.114
+[3.3.115]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.114...v3.3.115
+[3.3.116]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.115...v3.3.116
+[3.3.117]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.116...v3.3.117
+[3.3.118]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.117...v3.3.118
+[3.3.119]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.118...v3.3.119
+[3.3.120]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.119...v3.3.120
+[3.3.121]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.120...v3.3.121
+[3.3.122]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.121...v3.3.122
+[3.3.123]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.122...v3.3.123
+[3.3.124]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.123...v3.3.124
+[3.3.125]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.124...v3.3.125
+[3.3.126]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.125...v3.3.126
+[3.3.127]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.126...v3.3.127
+[3.3.128]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.127...v3.3.128
+[3.3.129]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.128...v3.3.129
+[3.3.130]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.129...v3.3.130
+[3.3.131]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.130...v3.3.131
+[3.3.132]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.131...v3.3.132
+[3.3.133]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.132...v3.3.133
+[3.3.134]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.133...v3.3.134
+[3.3.135]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.134...v3.3.135
+[3.3.136]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.135...v3.3.136
+[3.3.137]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.136...v3.3.137
+[3.3.138]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.137...v3.3.138
+[3.3.139]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.138...v3.3.139
+[3.3.140]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.139...v3.3.140
+[3.3.141]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.140...v3.3.141
+[3.3.142]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.141...v3.3.142
+[3.3.143]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.142...v3.3.143
+[3.3.144]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.143...v3.3.144
+[3.3.145]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.144...v3.3.145
+[3.3.146]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.145...v3.3.146
+[3.3.147]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.146...v3.3.147
+[3.3.148]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.147...v3.3.148
+[3.3.149]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.148...v3.3.149
+[3.3.150]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.149...v3.3.150
+[3.3.151]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.150...v3.3.151
+[3.3.152]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.151...v3.3.152
+[3.3.153]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.152...v3.3.153
+[3.3.154]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.153...v3.3.154
+[3.3.155]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.154...v3.3.155
+[3.3.156]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.155...v3.3.156
+[3.3.157]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.156...v3.3.157
+[3.3.158]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.157...v3.3.158
+[3.3.159]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.158...v3.3.159
+[3.3.160]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.159...v3.3.160
+[3.3.161]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.160...v3.3.161
+[3.3.162]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.161...v3.3.162
+[3.3.163]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.162...v3.3.163
+[3.3.164]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.163...v3.3.164
+[3.3.165]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.164...v3.3.165
+[3.3.166]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.165...v3.3.166
+[3.3.167]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.166...v3.3.167
+[3.3.168]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.167...v3.3.168
+[3.3.169]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.168...v3.3.169
+[3.3.170]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.169...v3.3.170
+[3.3.171]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.170...v3.3.171
+[3.3.172]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.171...v3.3.172
+[3.3.173]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.172...v3.3.173
+[3.3.174]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.173...v3.3.174
+[3.4.0]: https://github.com/UNITRONIX/BetterDesk/compare/v3.3.174...v3.4.0
+[3.4.1]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.0...v3.4.1
+[3.4.2]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.1...v3.4.2
+[3.4.3]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.2...v3.4.3
+[3.4.4]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.3...v3.4.4
+[3.4.5]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.4...v3.4.5
+[3.4.6]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.5...v3.4.6
+[3.4.7]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.6...v3.4.7
+[3.4.8]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.7...v3.4.8
+[3.4.9]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.8...v3.4.9
+[3.4.10]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.9...v3.4.10
+[3.4.11]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.10...v3.4.11
+[3.4.12]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.11...v3.4.12
+[3.4.13]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.12...v3.4.13
+[3.4.14]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.13...v3.4.14
+[3.4.15]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.14...v3.4.15
+[3.5.0]: https://github.com/UNITRONIX/BetterDesk/compare/v3.4.15...v3.5.0
+[3.5.1]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.0...v3.5.1
+[3.5.2]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.1...v3.5.2
+[3.5.3]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.2...v3.5.3
+[3.5.4]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.3...v3.5.4
+[3.5.5]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.4...v3.5.5
+[3.5.6]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.5...v3.5.6
+[3.5.7]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.6...v3.5.7
+[3.5.8]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.7...v3.5.8
+[3.5.9]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.8...v3.5.9
+[3.5.10]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.9...v3.5.10
+[3.5.11]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.10...v3.5.11
+[3.5.12]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.11...v3.5.12
+[3.5.13]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.12...v3.5.13
+[3.5.14]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.13...v3.5.14
+[3.5.15]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.14...v3.5.15
+[3.5.16]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.15...v3.5.16
+[3.5.17]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.16...v3.5.17
+[3.5.18]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.17...v3.5.18
+[3.5.19]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.18...v3.5.19
+[3.5.20]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.19...v3.5.20
+[3.5.21]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.20...v3.5.21
+[3.5.22]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.21...v3.5.22
+[3.5.23]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.22...v3.5.23
+[3.5.24]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.23...v3.5.24
+[3.5.25]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.24...v3.5.25
+[3.5.26]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.25...v3.5.26
+[3.5.27]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.26...v3.5.27
+[3.5.28]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.27...v3.5.28
+[3.5.29]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.28...v3.5.29
+[3.5.30]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.29...v3.5.30
+[3.5.31]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.30...v3.5.31
+[3.5.32]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.31...v3.5.32
+[3.5.33]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.32...v3.5.33
+[3.5.34]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.33...v3.5.34
+[3.5.35]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.34...v3.5.35
+[3.5.36]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.35...v3.5.36
+[3.5.37]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.36...v3.5.37
+[3.5.38]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.37...v3.5.38
+[3.5.39]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.38...v3.5.39
+[3.5.40]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.39...v3.5.40
+[3.5.41]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.40...v3.5.41
+[3.5.42]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.41...v3.5.42
+[3.5.43]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.42...v3.5.43
+[3.5.44]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.43...v3.5.44
+[3.5.45]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.44...v3.5.45
+[3.5.46]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.45...v3.5.46
+[3.5.47]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.46...v3.5.47
+[3.5.48]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.47...v3.5.48
+[3.5.49]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.48...v3.5.49
+[3.5.50]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.49...v3.5.50
+[3.5.51]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.50...v3.5.51
+[3.5.52]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.51...v3.5.52
+[3.5.53]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.52...v3.5.53
+[3.5.54]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.53...v3.5.54
+[3.5.55]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.54...v3.5.55
+[3.5.56]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.55...v3.5.56
+[3.5.57]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.56...v3.5.57
+[3.5.58]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.57...v3.5.58
+[3.5.59]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.58...v3.5.59
+[3.5.60]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.59...v3.5.60
+[3.5.61]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.60...v3.5.61
+[3.5.62]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.61...v3.5.62
+[3.5.63]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.62...v3.5.63
+[3.5.64]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.63...v3.5.64
+[3.5.65]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.64...v3.5.65
+[3.5.66]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.65...v3.5.66
+[3.5.67]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.66...v3.5.67
+[3.5.68]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.67...v3.5.68
+[3.5.69]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.68...v3.5.69
+[3.5.70]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.69...v3.5.70
+[3.5.71]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.70...v3.5.71
+[3.5.72]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.71...v3.5.72
+[3.5.73]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.72...v3.5.73
+[3.5.74]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.73...v3.5.74
+[3.5.75]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.74...v3.5.75
+[3.5.76]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.75...v3.5.76
+[3.5.77]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.76...v3.5.77
+[3.5.78]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.77...v3.5.78
+[3.5.79]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.78...v3.5.79
+[3.5.80]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.79...v3.5.80
+[3.5.81]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.80...v3.5.81
+[3.5.82]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.81...v3.5.82
+[3.5.83]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.82...v3.5.83
+[3.5.84]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.83...v3.5.84
+[3.5.85]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.84...v3.5.85
+[3.5.86]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.85...v3.5.86
+[3.5.87]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.86...v3.5.87
+[3.5.88]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.87...v3.5.88
+[3.5.89]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.88...v3.5.89
+[3.5.90]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.89...v3.5.90
+[3.5.91]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.90...v3.5.91
+[3.5.92]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.91...v3.5.92
+[3.5.93]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.92...v3.5.93
+[3.5.94]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.93...v3.5.94
+[3.5.95]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.94...v3.5.95
+[3.5.96]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.95...v3.5.96
+[3.5.97]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.96...v3.5.97
+[3.5.98]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.97...v3.5.98
+[3.5.99]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.98...v3.5.99
+[3.5.100]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.99...v3.5.100
+[3.5.101]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.100...v3.5.101
+[3.5.102]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.101...v3.5.102
+[3.5.103]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.102...v3.5.103
+[3.5.104]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.103...v3.5.104
+[3.5.105]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.104...v3.5.105
+[3.5.106]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.105...v3.5.106
+[3.5.107]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.106...v3.5.107
+[3.5.108]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.107...v3.5.108
+[3.5.109]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.108...v3.5.109
+[3.5.110]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.109...v3.5.110
+[3.5.111]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.110...v3.5.111
+[3.5.112]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.111...v3.5.112
+[3.5.113]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.112...v3.5.113
+[3.5.114]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.113...v3.5.114
+[3.5.115]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.114...v3.5.115
+[3.5.116]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.115...v3.5.116
+[3.5.117]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.116...v3.5.117
+[3.5.118]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.117...v3.5.118
+[3.5.119]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.118...v3.5.119
+[3.5.120]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.119...v3.5.120
+[3.5.121]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.120...v3.5.121
+[3.5.122]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.121...v3.5.122
+[3.5.123]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.122...v3.5.123
+[3.5.124]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.123...v3.5.124
+[3.5.125]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.124...v3.5.125
+[3.5.126]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.125...v3.5.126
+[3.5.127]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.126...v3.5.127
+[3.5.128]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.127...v3.5.128
+[3.5.129]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.128...v3.5.129
+[3.5.130]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.129...v3.5.130
+[3.5.131]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.130...v3.5.131
+[3.5.132]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.131...v3.5.132
+[3.5.133]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.132...v3.5.133
+[3.5.134]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.133...v3.5.134
+[3.5.135]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.134...v3.5.135
+[3.5.136]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.135...v3.5.136
+[3.5.137]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.136...v3.5.137
+[3.5.138]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.137...v3.5.138
+[3.5.139]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.138...v3.5.139
+[3.5.140]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.139...v3.5.140
+[3.5.141]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.140...v3.5.141
+[3.5.142]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.141...v3.5.142
+[3.5.143]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.142...v3.5.143
+[3.5.144]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.143...v3.5.144
+[3.5.145]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.144...v3.5.145
+[3.5.146]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.145...v3.5.146
+[3.5.147]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.146...v3.5.147
+[3.5.148]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.147...v3.5.148
+[3.5.149]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.148...v3.5.149
+[3.5.150]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.149...v3.5.150
+[3.5.151]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.150...v3.5.151
+[3.5.152]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.151...v3.5.152
+[3.5.153]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.152...v3.5.153
+[3.5.154]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.153...v3.5.154
+[3.5.155]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.154...v3.5.155
+[3.5.156]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.155...v3.5.156
+[3.5.157]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.156...v3.5.157
+[3.5.158]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.157...v3.5.158
+[3.5.159]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.158...v3.5.159
+[3.5.160]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.159...v3.5.160
+[3.5.161]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.160...v3.5.161
+[3.5.162]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.161...v3.5.162
+[3.5.163]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.162...v3.5.163
+[3.5.164]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.163...v3.5.164
+[3.5.165]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.164...v3.5.165
+[3.5.166]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.165...v3.5.166
+[3.5.167]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.166...v3.5.167
+[3.5.168]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.167...v3.5.168
+[3.5.169]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.168...v3.5.169
+[3.5.170]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.169...v3.5.170
+[3.5.171]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.170...v3.5.171
+[3.5.172]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.171...v3.5.172
+[3.5.173]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.172...v3.5.173
+[3.5.174]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.173...v3.5.174
+[3.5.175]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.174...v3.5.175
+[3.5.176]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.175...v3.5.176
+[3.5.177]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.176...v3.5.177
+[3.5.178]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.177...v3.5.178
+[3.5.179]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.178...v3.5.179
+[3.5.180]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.179...v3.5.180
+[3.5.181]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.180...v3.5.181
+[3.5.182]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.181...v3.5.182
+[3.5.183]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.182...v3.5.183
+[3.5.184]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.183...v3.5.184
+[3.5.185]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.184...v3.5.185
+[3.5.186]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.185...v3.5.186
+[3.5.187]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.186...v3.5.187
+[3.5.188]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.187...v3.5.188
+[3.5.189]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.188...v3.5.189
+[3.5.190]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.189...v3.5.190
+[3.5.191]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.190...v3.5.191
+[3.5.192]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.191...v3.5.192
+[3.5.193]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.192...v3.5.193
+[3.5.194]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.193...v3.5.194
+[3.5.195]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.194...v3.5.195
+[3.5.196]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.195...v3.5.196
+[3.5.197]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.196...v3.5.197
+[3.5.198]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.197...v3.5.198
+[3.5.199]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.198...v3.5.199
+[3.5.200]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.199...v3.5.200
+[3.5.201]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.200...v3.5.201
+[3.5.202]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.201...v3.5.202
+[3.5.203]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.202...v3.5.203
+[3.5.204]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.203...v3.5.204
+[3.5.205]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.204...v3.5.205
+[3.5.206]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.205...v3.5.206
+[3.5.207]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.206...v3.5.207
+[3.5.208]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.207...v3.5.208
+[3.5.209]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.208...v3.5.209
+[3.5.210]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.209...v3.5.210
+[3.5.211]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.210...v3.5.211
+[3.5.212]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.211...v3.5.212
+[3.5.213]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.212...v3.5.213
+[3.5.214]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.213...v3.5.214
+[3.5.215]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.214...v3.5.215
+[3.5.216]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.215...v3.5.216
+[3.5.217]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.216...v3.5.217
+[3.5.218]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.217...v3.5.218
+[3.5.219]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.218...v3.5.219
+[3.5.220]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.219...v3.5.220
+[3.5.221]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.220...v3.5.221
+[3.5.222]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.221...v3.5.222
+[3.5.223]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.222...v3.5.223
+[3.5.224]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.223...v3.5.224
+[3.5.225]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.224...v3.5.225
+[3.5.226]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.225...v3.5.226
+[3.5.227]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.226...v3.5.227
+[3.5.228]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.227...v3.5.228
+[3.5.229]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.228...v3.5.229
+[3.5.230]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.229...v3.5.230
+[3.5.231]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.230...v3.5.231
+[3.5.232]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.231...v3.5.232
+[3.5.233]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.232...v3.5.233
+[3.5.234]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.233...v3.5.234
+[3.5.235]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.234...v3.5.235
+[3.5.236]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.235...v3.5.236
+[3.5.237]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.236...v3.5.237
+[3.5.238]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.237...v3.5.238
+[3.5.239]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.238...v3.5.239
+[3.5.240]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.239...v3.5.240
+[3.5.241]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.240...v3.5.241
+[3.5.242]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.241...v3.5.242
+[3.5.243]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.242...v3.5.243
+[3.5.244]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.243...v3.5.244
+[3.5.245]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.244...v3.5.245
+[3.5.246]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.245...v3.5.246
+[3.5.247]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.246...v3.5.247
+[3.5.248]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.247...v3.5.248
+[3.5.249]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.248...v3.5.249
+[3.5.250]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.249...v3.5.250
+[3.5.251]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.250...v3.5.251
+[3.5.252]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.251...v3.5.252
+[3.5.253]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.252...v3.5.253
+[3.5.254]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.253...v3.5.254
+[3.5.255]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.254...v3.5.255
+[3.5.256]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.255...v3.5.256
+[3.5.257]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.256...v3.5.257
+[3.5.258]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.257...v3.5.258
+[3.5.259]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.258...v3.5.259
+[3.5.260]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.259...v3.5.260
+[3.5.261]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.260...v3.5.261
+[3.5.262]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.261...v3.5.262
+[3.5.263]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.262...v3.5.263
+[3.5.264]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.263...v3.5.264
+[3.5.265]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.264...v3.5.265
+[3.5.266]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.265...v3.5.266
+[3.5.267]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.266...v3.5.267
+[3.5.268]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.267...v3.5.268
+[3.5.269]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.268...v3.5.269
+[3.5.270]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.269...v3.5.270
+[3.5.271]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.270...v3.5.271
+[3.5.272]: https://github.com/UNITRONIX/BetterDesk/compare/v3.5.271...v3.5.272

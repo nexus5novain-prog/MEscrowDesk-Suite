@@ -1,0 +1,126 @@
+name: Build MindConnect Desk Android Agent APK
+
+on:
+  push:
+    branches: [main, master, dev]
+    paths:
+      - 'plain-app/**'
+      - '.github/workflows/build-agent-apk.yml'
+  workflow_dispatch:
+    inputs:
+      id_server:
+        description: "Default ID / Relay Server Host"
+        required: true
+        default: "104.207.90.103"
+      api_url:
+        description: "Default MindConnect Desk API URL"
+        required: true
+        default: "http://104.207.90.103:21121"
+      cdap_ws_url:
+        description: "Default CDAP WebSocket URL"
+        required: true
+        default: "ws://104.207.90.103:21122/cdap"
+      id_port:
+        description: "Default ID Port"
+        required: true
+        default: "21116"
+      relay_port:
+        description: "Default Relay Port"
+        required: true
+        default: "21117"
+      server_key:
+        description: "MindConnect Desk Ed25519 server public key (base64)"
+        required: true
+        default: "ddU+/IrwdxX+Y/CGwJK7Ap3/lGNvYrLMTXcizekHlWo="
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build MindConnect Desk APK (arm64-v8a)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plain-app
+    env:
+      RUSTUP_TOOLCHAIN: stable
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            plain-app/**/*.gradle*
+            plain-app/**/gradle-wrapper.properties
+
+      - uses: android-actions/setup-android@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Configure Android SDK, NDK, and Debug Keystore
+        run: |
+          SDK_DIR="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          if [ ! -d "$SDK_DIR/ndk" ] || [ -z "$(ls -A "$SDK_DIR/ndk" 2>/dev/null)" ]; then
+            yes | sdkmanager --licenses >/dev/null || true
+            sdkmanager --install "ndk;27.2.12479018"
+          fi
+          echo "sdk.dir=$SDK_DIR" > local.properties
+          ls -la "$SDK_DIR/ndk"
+          NDK_DIR=$(find "$SDK_DIR/ndk" -mindepth 1 -maxdepth 1 -name "27*" | head -n 1)
+          if [ -n "$NDK_DIR" ]; then
+            echo "ANDROID_NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
+            echo "ndk.dir=$NDK_DIR" >> local.properties
+          fi
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Build MindConnect Desk Agent APK (arm64-v8a, debug-signed)
+        run: |
+          chmod +x ./gradlew scripts/onnx_python_wrapper.py
+          ID_SERVER="${{ github.event.inputs.id_server || '104.207.90.103' }}"
+          API_URL="${{ github.event.inputs.api_url || 'http://104.207.90.103:21121' }}"
+          CDAP_WS_URL="${{ github.event.inputs.cdap_ws_url || 'ws://104.207.90.103:21122/cdap' }}"
+          ID_PORT="${{ github.event.inputs.id_port || '21116' }}"
+          RELAY_PORT="${{ github.event.inputs.relay_port || '21117' }}"
+          SERVER_KEY="${{ github.event.inputs.server_key || 'ddU+/IrwdxX+Y/CGwJK7Ap3/lGNvYrLMTXcizekHlWo=' }}"
+          ./gradlew assembleGithubDebug \
+            --no-daemon \
+            --max-workers=2 \
+            -PabiFilters=arm64-v8a \
+            -PBETTERDESK_ID_SERVER="$ID_SERVER" \
+            -PBETTERDESK_ID_PORT="$ID_PORT" \
+            -PBETTERDESK_RELAY_SERVER="$ID_SERVER" \
+            -PBETTERDESK_RELAY_PORT="$RELAY_PORT" \
+            -PBETTERDESK_API_URL="$API_URL" \
+            -PBETTERDESK_CDAP_WS_URL="$CDAP_WS_URL" \
+            -PBETTERDESK_SERVER_KEY="$SERVER_KEY"
+          cp app/build/outputs/apk/github/debug/app-github-debug.apk MindConnect-Desk-arm64-v8a-debug.apk
+          unzip -l MindConnect-Desk-arm64-v8a-debug.apk | grep "lib/arm64-v8a/"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mindconnect-desk-android-agent-apk
+          path: plain-app/MindConnect-Desk-arm64-v8a-debug.apk
+          if-no-files-found: error
+          retention-days: 30

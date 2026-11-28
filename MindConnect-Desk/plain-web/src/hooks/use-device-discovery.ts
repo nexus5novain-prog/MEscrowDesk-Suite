@@ -1,0 +1,143 @@
+import { GqlError } from '@/lib/api/gql-error'
+import { ref } from 'vue'
+import { startDiscoveryGQL, stopDiscoveryGQL } from '@/lib/api/mutation'
+import { bindGraphqlClient } from '@/lib/api/gql-client'
+import { graphqlSubscriptions } from '@/lib/api/subscription-client'
+import { nearbyDevicesGQL } from '@/lib/api/query'
+import { useChatStore } from '@/stores/chat'
+import { pairingViews } from '@/lib/device/pairing'
+import { DeviceType, PeerStatus } from '@/lib/status'
+
+export type DiscoveryMethod = 'LAN' | 'BLE' | 'QR'
+
+export type DiscoveryDeviceStatus = 'PAIRING' | 'UNPAIRING' | PeerStatus
+
+export interface DiscoveredDevice {
+  id: string
+  name: string
+  ips: string[]
+  bestIp?: string
+  port: number
+  remoteAccess?: boolean | null
+  deviceType: DeviceType
+  version: string
+  platform: string
+  lastSeen: string
+  status: DiscoveryDeviceStatus
+  discoveryMethods: DiscoveryMethod[]
+}
+
+export enum DiscoveryStatus {
+  IDLE,
+  SEARCHING,
+  OK,
+  PERMISSION_DENIED,
+  NETWORK_ERROR,
+}
+
+const devices = ref<DiscoveredDevice[]>([])
+const status = ref<DiscoveryStatus>(DiscoveryStatus.IDLE)
+
+function restoreDeviceStatus(deviceId: string) {
+  const device = devices.value.find((d) => d.id === deviceId)
+  if (device) device.status = useChatStore().findPeer(deviceId)?.status ?? PeerStatus.UNPAIRED
+}
+
+export function useDeviceDiscovery(bindClient = bindGraphqlClient, subscriptions = graphqlSubscriptions) {
+
+  let request: ReturnType<typeof bindGraphqlClient> | null = null
+  let active = false
+  let pollTimer: ReturnType<typeof setInterval> | undefined
+  let pending = Promise.resolve()
+
+  async function discoveryRequest(client: ReturnType<typeof bindGraphqlClient>, document: string): Promise<void> {
+    const result = await client(document)
+    if (result.errors?.length) throw GqlError.fromGraphql(result.errors[0])
+  }
+
+  function enqueue(operation: () => Promise<void>): Promise<void> {
+    const result = pending.then(operation)
+    pending = result.catch(() => {})
+    return result
+  }
+
+  async function poll(): Promise<void> {
+    const client = request
+    if (!active || !client) return
+    await enqueue(async () => {
+      if (!active || request !== client) return
+      try {
+        const result = await client<{ isDiscovering: boolean; nearbyDevices: DiscoveredDevice[] }>(nearbyDevicesGQL)
+        if (result.errors?.length) throw GqlError.fromGraphql(result.errors[0])
+        if (!active || request !== client) return
+        devices.value = result.data.nearbyDevices
+        if (!result.data.isDiscovering) await discoveryRequest(client, startDiscoveryGQL)
+        if (active && request === client) status.value = devices.value.length ? DiscoveryStatus.OK : DiscoveryStatus.SEARCHING
+      } catch (error) {
+        if (active) status.value = DiscoveryStatus.NETWORK_ERROR
+        console.error('discovery status poll failed', error)
+      }
+    })
+  }
+
+  let stopSubscriptions: (() => void)[] = []
+
+  async function start(): Promise<void> {
+    if (active) return
+    request = bindClient()
+    active = true
+    stopSubscriptions = [
+      subscriptions.subscribe('pairingStarted', notice => {
+        const device = devices.value.find(device => device.id === notice.deviceId)
+        if (device) device.status = 'PAIRING'
+      }),
+      subscriptions.subscribe('pairingCompleted', notice => {
+        const device = devices.value.find(device => device.id === notice.deviceId)
+        if (device) device.status = PeerStatus.PAIRED
+        useChatStore().fetchPeers()
+      }),
+      subscriptions.subscribe('pairingFailed', notice => restoreDeviceStatus(notice.deviceId)),
+      subscriptions.subscribe('pairingCanceled', notice => restoreDeviceStatus(notice.deviceId)),
+      subscriptions.onAttached(poll),
+    ]
+    status.value = DiscoveryStatus.SEARCHING
+    pollTimer = setInterval(() => { void poll() }, 2000)
+    await poll()
+  }
+
+  async function stop(): Promise<void> {
+    const client = request
+    if (!active || !client) return
+    active = false
+    clearInterval(pollTimer)
+    pollTimer = undefined
+    stopSubscriptions.forEach(stop => stop())
+    stopSubscriptions = []
+    await enqueue(async () => {
+      try { await discoveryRequest(client, stopDiscoveryGQL) }
+      catch (error) { console.error('discovery stop failed', error) }
+    })
+    status.value = DiscoveryStatus.IDLE
+    devices.value = []
+    pairingViews.clear()
+  }
+
+  function retry() {
+    status.value = DiscoveryStatus.SEARCHING
+    return active ? poll() : start()
+  }
+
+  async function openLanPermissionSettings() {
+    if (__IS_TAURI__) {
+      const { openUrl } = await import('@/lib/tauri-plugins')
+      await openUrl('x-apple.systempreferences:').catch(async () => {
+        await openUrl('https://support.apple.com/guide/mac-help/mchla4f49138/mac')
+      })
+      return
+    }
+    if (typeof window === 'undefined') return
+    window.location.href = 'x-apple.systempreferences:'
+  }
+
+  return { devices, pairingViews, status, start, stop, retry, openLanPermissionSettings }
+}

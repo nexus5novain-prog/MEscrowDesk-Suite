@@ -1,0 +1,21 @@
+import type { TimeagoMessages } from '@/lib/timeago'
+
+export default {
+  now: 'Az önce',
+  short: {
+    minutes: '{n} dk',
+    hours: '{n} sa',
+    days: '{n} g',
+    weeks: '{n} hf',
+    months: '{n} ay',
+    years: '{n} yıl',
+  },
+  long: {
+    minutes: '{n} dakika önce',
+    hours: '{n} saat önce',
+    days: '{n} gün önce',
+    weeks: '{n} hafta önce',
+    months: '{n} ay önce',
+    years: '{n} yıl önce',
+  },
+} as const satisfies TimeagoMessages

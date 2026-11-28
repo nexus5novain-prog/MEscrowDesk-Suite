@@ -1,0 +1,178 @@
+<template>
+  <section class="info" @wheel.stop>
+    <div class="info-header">
+      <div class="info-title">
+        <LightboxQualityDropdown
+          v-if="isImage(current?.name ?? '')"
+          :model-value="imageQuality"
+          @update:model-value="$emit('update:image-quality', $event)"
+        />
+        <lightbox-keyboard-shortcuts class="info-keyboard-shortcuts" />
+      </div>
+      <div class="info-actions">
+        <LightboxFileActionButtons
+          ref="fileActions"
+          :current="current"
+          :delete-file="deleteFile"
+          :read-only="readOnly"
+          @rename-file="$emit('rename-file')"
+        />
+      </div>
+    </div>
+    <div class="info-content">
+      <LightboxFileDetails 
+        :current="current" 
+        :file-info="fileInfo" 
+        :app-dir="appDir" 
+      />
+
+      <LightboxMoveToFolders
+        v-if="showMoveToFolders"
+        :current="current"
+        @moved="onMoved"
+      />
+      
+      <LightboxFileTags 
+        :current="current" 
+        :tags-map="tagsMap"
+        :item-tags="itemTags"
+      />
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted, useTemplateRef, type PropType } from 'vue'
+import { isImage, isZipPath } from '@/lib/file'
+import { DataType } from '@/lib/data'
+import { useMediaTrash, useFileTrashState } from '@/hooks/media-trash'
+import { useOrganizeUndo } from '@/hooks/organize-undo'
+import type { ITag } from '@/lib/interfaces'
+import type { ISource } from './types'
+import LightboxMoveToFolders from './LightboxMoveToFolders.vue'
+import LightboxFileActionButtons from './LightboxFileActionButtons.vue'
+
+const props = defineProps({
+  current: {
+    type: Object as () => ISource | undefined,
+    required: true,
+  },
+  fileInfo: {
+    type: Object,
+    default: null,
+  },
+  urlTokenKey: {
+    type: String,
+    required: true,
+  },
+  appDir: {
+    type: String,
+    default: '',
+  },
+  tagsMap: {
+    type: Object as () => Map<string, ITag[]>,
+    required: true,
+  },
+  itemTags: {
+    type: Array as () => { tagId: string; key: string }[],
+    default: () => [],
+  },
+  deleteFile: {
+    type: Function as PropType<() => Promise<boolean>>,
+    required: true,
+  },
+  readOnly: {
+    type: Boolean,
+    default: false,
+  },
+  imageQuality: {
+    type: String as () => 'fast' | 'original',
+    required: true,
+  },
+})
+
+const emit = defineEmits(['rename-file', 'refetch-info', 'update:image-quality'])
+const fileActions = useTemplateRef<InstanceType<typeof LightboxFileActionButtons>>('fileActions')
+
+const { isTrashed, canTrash, canDelete, canMove } = useFileTrashState(() => props.current)
+const { trash } = useMediaTrash()
+const { record } = useOrganizeUndo()
+const inZip = computed(() => isZipPath(props.current?.path ?? ''))
+const showMoveToFolders = computed(
+  () => canMove.value && !props.readOnly && !inZip.value && props.current?.type === DataType.IMAGE && !isTrashed.value,
+)
+
+function onMoved() {
+  emit('refetch-info')
+}
+
+async function handleKeyDown(event: KeyboardEvent) {
+  if (props.readOnly || props.current?.isFromChat || inZip.value) return
+  if (event.key === 'Delete' || ((event.ctrlKey || event.metaKey) && event.key === 'Backspace')) {
+    event.preventDefault()
+    
+    if (canTrash.value) {
+      if (isTrashed.value) {
+        // Already in trash, permanently delete
+        if (canDelete.value) fileActions.value?.requestDelete()
+      } else {
+        // Not in trash, move to trash
+        if (props.current?.data?.id && props.current.type) {
+          const type = props.current.type as DataType
+          const query = `ids:${props.current.data.id}`
+          if (await trash(type, query)) record({ kind: 'trash', type, query })
+        }
+      }
+    } else {
+      // Can't trash, directly delete
+      if (canDelete.value) fileActions.value?.requestDelete()
+    }
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyDown)
+})
+</script>
+
+<style lang="scss" scoped>
+.info {
+  grid-area: info;
+  width: 350px;
+  height: 100vh;
+  box-sizing: border-box;
+  background: var(--md-sys-color-surface-container);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-header {
+  padding: 8px 16px;
+}
+
+.info-title {
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  span {
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+}
+
+.info-content {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.info-keyboard-shortcuts {
+  margin-inline-start: auto;
+}
+</style>

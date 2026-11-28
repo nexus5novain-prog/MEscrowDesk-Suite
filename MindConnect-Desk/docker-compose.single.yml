@@ -1,0 +1,194 @@
+# BetterDesk — Simplified Docker Compose (Single Container, source build)
+# ===========================================================
+#
+# All-in-one: Go server + Node.js console in a single container.
+# THIS FILE builds betterdesk:local (pull_policy: never).
+# `docker compose pull` does NOT refresh BetterDesk — rebuild after git pull:
+#   git pull && docker compose -f docker-compose.single.yml up -d --build
+#
+# PREBUILT GHCR (no local build) — prefer:
+#   curl -fsSL …/docker-compose.quick.single.yml -o docker-compose.yml
+#   docker compose pull && docker compose up -d
+#
+# Quick start (SQLite — default):
+#   docker compose -f docker-compose.single.yml up -d --build
+#
+# With PostgreSQL:
+#   PG_PASSWORD=YourStrongPasswordHere \
+#   DB_TYPE=postgres DATABASE_URL=postgres://betterdesk:YourStrongPasswordHere@postgres:5432/betterdesk \
+#     docker compose -f docker-compose.single.yml --profile postgres up -d --build
+#
+#   Or create a .env file:
+#     DB_TYPE=postgres
+#     DATABASE_URL=postgres://betterdesk:YourStrongPasswordHere@postgres:5432/betterdesk
+#     PG_PASSWORD=YourStrongPasswordHere
+#   Then: docker compose -f docker-compose.single.yml --profile postgres up -d --build
+#
+# Access:
+#   Web Console: http://localhost:5000
+#   Client API:  http://localhost:21121  (not panel :5000)
+#   Admin password: auto-generated unless ADMIN_PASSWORD is set before first start
+
+services:
+  # BetterDesk All-in-One (Go server + Node.js console)
+  betterdesk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: betterdesk:local
+    pull_policy: never
+    container_name: betterdesk
+    hostname: betterdesk
+    ports:
+      - "5000:5000"             # Web Console (LAN)
+      - "21115:21115"           # NAT type test
+      - "21116:21116/tcp"       # Signal TCP
+      - "21116:21116/udp"       # Signal UDP
+      - "21117:21117"           # Relay TCP
+      - "21118:21118"           # WebSocket Signal
+      - "21119:21119"           # WebSocket Relay
+      - "21121:21121"           # HTTP API (RustDesk client + REST, WAN-facing)
+    volumes:
+      - betterdesk-data:/opt/rustdesk
+      - console-data:/app/data
+    environment:
+      - NODE_ENV=production
+      # Set TRUST_PROXY=1 when the panel is behind one reverse proxy.
+      - TRUST_PROXY=${TRUST_PROXY:-}
+      - PORT=5000
+      - HOST=0.0.0.0
+      - API_HOST=0.0.0.0
+      - API_ENABLED=false
+      - ENCRYPTED_ONLY=1
+      - SERVER_BACKEND=betterdesk
+      - HBBS_API_URL=http://127.0.0.1:21121/api
+      - BETTERDESK_API_URL=http://127.0.0.1:21121/api
+      - RUSTDESK_PATH=/opt/rustdesk
+      - DATA_DIR=/app/data
+      - BETTERDESK_CLIENT_REPO=${BETTERDESK_CLIENT_REPO:-UNITRONIX/BetterDesk-Client}
+      - BETTERDESK_CLIENT_RELEASE_TAG=${BETTERDESK_CLIENT_RELEASE_TAG:-}
+      - BETTERDESK_GITHUB_TOKEN=${BETTERDESK_GITHUB_TOKEN:-}
+      - BETTERDESK_CUSTOM_CLIENT_SIGNING_SEED=${BETTERDESK_CUSTOM_CLIENT_SIGNING_SEED:-}
+      - AGENT_ARTIFACT_DIR=/app/data/agent-builds
+      - AGENT_BUILD_WORKER=${AGENT_BUILD_WORKER:-on}
+      - AGENT_BUILD_POLL_MS=${AGENT_BUILD_POLL_MS:-5000}
+      - AGENT_BUILD_COOLDOWN_MS=${AGENT_BUILD_COOLDOWN_MS:-1000}
+      - DB_PATH=/opt/rustdesk/db_v2.sqlite3
+      - PUB_KEY_PATH=/opt/rustdesk/id_ed25519.pub
+      - API_KEY_PATH=/opt/rustdesk/.api_key
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      # Panel session policy (empty = built-in defaults; see web-nodejs/.env.example)
+      - SESSION_IDLE_TIMEOUT=${SESSION_IDLE_TIMEOUT:-}
+      - SESSION_MAX_AGE=${SESSION_MAX_AGE:-}
+      - SESSION_IDLE_WARN_MS=${SESSION_IDLE_WARN_MS:-}
+      - SESSION_MAX_PER_USER=${SESSION_MAX_PER_USER:-}
+      - DOCKER=true
+      # Optional: map betterdesk to host bind-mount owner (Synology etc.). Default 10001.
+      - PUID=${PUID:-10001}
+      - PGID=${PGID:-10001}
+      # Database — defaults to SQLite; set via .env or command line for PostgreSQL
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - DB_URL=${DATABASE_URL:-}
+      - SQLITE_AUTH_DB_MODE=${SQLITE_AUTH_DB_MODE:-}
+      # Relay server address (public IP or domain).
+      # Auto-detected if not set. MUST be set if auto-detection returns
+      # Docker internal IP (172.x.x.x) — remote relay connections will fail otherwise.
+      - RELAY_SERVERS=${RELAY_SERVERS:-}
+      # Raise this for very large NAT/proxy deployments; 0 disables signal rate limiting.
+      - SIGNAL_RATE_LIMIT_PER_IP=${SIGNAL_RATE_LIMIT_PER_IP:-20}
+      - ALLOW_LEGACY_OUTBOUND=${ALLOW_LEGACY_OUTBOUND:-N}
+      # Enrollment policy. Fresh volumes default to "managed" (operator approves
+      # new devices); pre-existing volumes keep their current mode. Override with
+      # "open", "managed", or "locked".
+      - ENROLLMENT_MODE=${ENROLLMENT_MODE:-}
+      - NTP_SERVERS=${NTP_SERVERS:-pool.ntp.org,time.google.com,time.cloudflare.com}
+      - BILLING_MAX_CLOCK_SKEW_MS=${BILLING_MAX_CLOCK_SKEW_MS:-2000}
+      - BILLING_REQUIRE_SYNCED_CLOCK=${BILLING_REQUIRE_SYNCED_CLOCK:-1}
+      - BILLING_TRUST_OS_NTP=${BILLING_TRUST_OS_NTP:-Y}
+      # Panel folders/groups for RustDesk client (SQLite — same container as console).
+      - AUTH_DB_PATH=/app/data/auth.db
+      # Admin credentials (first run only; existing users are not overwritten).
+      # Do NOT comment these out — ADMIN_PASSWORD on the host shell only reaches
+      # the container when referenced here (issue #385).
+      #   ADMIN_PASSWORD=YourSecurePassword123 docker compose -f docker-compose.single.yml up -d --build
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - INIT_ADMIN_USER=${ADMIN_USERNAME:-admin}
+      - INIT_ADMIN_PASS=${ADMIN_PASSWORD:-}
+      - DEFAULT_ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    restart: unless-stopped
+    # SECURITY (audit fix L-02, 2026-04-10): drop all capabilities except
+    # those needed by the entrypoint to chown volumes + su-exec to non-root.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - FOWNER
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:21121/api/health && curl -sf http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # PostgreSQL (optional — use with --profile postgres)
+  postgres:
+    image: postgres:16-alpine
+    container_name: betterdesk-postgres
+    environment:
+      - POSTGRES_USER=betterdesk
+      # Compose interpolates profile variables even when the profile is disabled.
+      # Keep SQLite/default validation usable without a secret; the postgres
+      # profile still requires PG_PASSWORD to be set before it is started.
+      - POSTGRES_PASSWORD=${PG_PASSWORD:-}
+      - POSTGRES_DB=betterdesk
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    # L-02: drop caps for PostgreSQL; gosu needs SETUID/SETGID to drop root.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - FOWNER
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U betterdesk"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - postgres
+
+  # Nginx Reverse Proxy (optional — use with --profile nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: betterdesk-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    restart: unless-stopped
+    depends_on:
+      - betterdesk
+    profiles:
+      - nginx
+
+volumes:
+  betterdesk-data:
+  console-data:
+  postgres-data:
+
+networks:
+  default:
+    name: betterdesk-net

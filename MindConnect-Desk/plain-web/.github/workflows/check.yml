@@ -1,0 +1,130 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-check:
+    name: frontend checks
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: plain-desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plain-desktop
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve locked Core revision
+        id: core
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync, readFileSync } from 'node:fs'
+          const lock = readFileSync('Cargo.lock', 'utf8')
+          const revisions = new Set([...lock.matchAll(/source = "git\+https:\/\/github\.com\/plainhub\/plain-core\.git\?branch=main#([a-f0-9]{40})"/g)].map((match) => match[1]))
+          if (revisions.size !== 1) throw new Error('Expected one locked Core revision')
+          appendFileSync(process.env.GITHUB_OUTPUT, `revision=${[...revisions][0]}\n`)
+          JS
+
+      - name: Checkout shared Core assets
+        uses: actions/checkout@v4
+        with:
+          repository: plainhub/plain-core
+          ref: ${{ steps.core.outputs.revision }}
+          path: plain-core
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            plain-desktop/.yarn/cache
+            plain-desktop/.yarn/install-state.gz
+          key: ${{ runner.os }}-yarn-${{ hashFiles('plain-desktop/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install frontend dependencies
+        run: yarn install --immutable
+
+      - name: Typecheck frontend
+        run: yarn typecheck
+
+      - name: Build web frontend
+        run: yarn build
+
+      - name: Build Tauri frontend
+        run: VITE_APP_MODE=tauri yarn build
+
+      - name: Run frontend unit tests (web)
+        run: yarn test
+
+      - name: Run frontend unit tests (Tauri)
+        run: VITE_APP_MODE=tauri yarn test
+
+  cargo-check:
+    name: cargo check (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            os: macos-latest
+          - platform: windows
+            os: windows-2022
+          - platform: linux
+            os: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          key: ${{ matrix.platform }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf \
+            pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev \
+            libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev
+          echo 'CC=gcc-14' >> "$GITHUB_ENV"
+          echo 'CXX=g++-14' >> "$GITHUB_ENV"
+
+      - name: Run cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Assert the capture layer stays Tauri-free
+        shell: bash
+        run: '! grep -rn "tauri" src-tauri/src/capture/'
+
+      - name: Run screen capture Rust tests
+        run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked --lib commands::screen_capture::'
+
+      - name: Run full Rust test suite
+        if: matrix.platform == 'linux'
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib

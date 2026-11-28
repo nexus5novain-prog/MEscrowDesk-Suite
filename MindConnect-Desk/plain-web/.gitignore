@@ -1,0 +1,52 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.DS_Store
+dist
+dist-ssr
+coverage
+*.local
+
+/cypress/videos/
+/cypress/screenshots/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.yarn
+# i18n pipeline temp files
+scripts/i18n-todo.json
+scripts/i18n-translated.json
+# Crowdin staging directory (JSON intermediates; not committed)
+.crowdin/
+.opencode/tmp/
+# Vitest Browser Mode artifacts
+.vitest-attachments/
+tests/**/__screenshots__/
+.harness/
+target/
+# Local machine cargo config (mac dev linker for TCC-stable signing); not part of the build
+.cargo/config.toml
+# Local project docs kept out of VCS
+AGENTS.md
+DONE.md
+TODO.md
+.workbuddy
+.trae
+.ai
+
+
+.cargo/core-dependency-state/

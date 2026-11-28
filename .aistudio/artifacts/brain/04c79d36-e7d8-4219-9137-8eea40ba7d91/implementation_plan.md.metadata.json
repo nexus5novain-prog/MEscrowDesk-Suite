@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan to merge the GitHub MindConnect Desk codebase with the local workspace fixes, repair the broken Android Rust/ONNX build, resolve server runtime paths cleanly, regenerate and serve the complete project ZIP archive, and verify a green GitHub Actions APK build.",
+  "updatedAt":  "2026-11-28T00:06:58.765413254Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

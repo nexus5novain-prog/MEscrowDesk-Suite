@@ -1,0 +1,168 @@
+<template>
+  <nav class="app-rail">
+    <div class="rail-items">
+      <router-link
+        v-tooltip="$t('page_title.home')"
+        to="/"
+        class="rail-item"
+        :class="{ active: isHomeActive() }"
+        :aria-label="$t('page_title.home')"
+      >
+        <i-lucide:home />
+      </router-link>
+      <router-link
+        v-for="feat in railFeatures"
+        :key="feat.id"
+        v-tooltip="$t(feat.titleKey)"
+        :to="lastRoute(feat.defaultPath, feat.group)"
+        class="rail-item"
+        :class="{ active: isActive(feat) }"
+        :aria-label="$t(feat.titleKey)"
+      >
+        <component :is="feat.icon" />
+      </router-link>
+    </div>
+
+    <div class="rail-spacer"></div>
+
+    <RailSettingsPopup />
+  </nav>
+</template>
+
+<script setup lang="ts">
+import { computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useMainStore } from '@/stores/main'
+import { useTempStore } from '@/stores/temp'
+import { storeToRefs } from 'pinia'
+import { ALL_FEATURES, getAvailableFeatures, type Feature } from './features'
+import RailSettingsPopup from './RailSettingsPopup.vue'
+
+const store = useMainStore()
+const router = useRouter()
+const tempStore = useTempStore()
+const { app } = storeToRefs(tempStore)
+
+const availableFeatures = computed(() => getAvailableFeatures(app.value?.capabilities))
+
+const railFeatures = computed<Feature[]>(() => {
+  const features = store.railFeatures
+    .map((id) => ALL_FEATURES.find((f) => f.id === id))
+    .filter((f): f is Feature => !!f && availableFeatures.value.some((a) => a.id === f.id))
+  return features
+})
+
+function isActive(feat: Feature) {
+  try {
+    const path = router.currentRoute.value.path
+    const prefix = '/' + feat.group.replace('_', '-')
+    return path.startsWith(prefix)
+  } catch {
+    return false
+  }
+}
+
+function isHomeActive() {
+  return router.currentRoute.value.path === '/'
+}
+
+function lastRoute(defaultPath: string, group: string) {
+  try {
+    const saved = store.lastRoutes[group]
+    if (!saved) return defaultPath
+    const resolved = router.resolve(saved)
+    const g = (resolved.meta?.group || '') as string
+    return g === group ? saved : defaultPath
+  } catch {
+    return defaultPath
+  }
+}
+
+watch(() => router.currentRoute.value, (to) => {
+  const group = (to.meta?.group || '') as string
+  if (group) {
+    store.lastRoutes[group] = to.fullPath
+  }
+}, { immediate: true })
+</script>
+
+<style lang="scss" scoped>
+.app-rail {
+  grid-area: rail;
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.rail-items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  width: 100%;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.rail-item {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 6px 0;
+  text-decoration: none;
+  flex-shrink: 0;
+  padding-inline: 4px;
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.rail-item:hover,
+.rail-item.active {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+  color: var(--md-sys-color-primary);
+}
+
+.rail-spacer {
+  flex-shrink: 0;
+  height: 8px;
+}
+
+@media (max-width: 768px) {
+  .app-rail {
+    flex-direction: row;
+    width: auto;
+    min-width: 0;
+    padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  }
+
+  .rail-spacer {
+    display: none;
+  }
+
+  .rail-items {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .rail-item {
+    flex: 1 1 0;
+    min-width: 56px;
+    margin: 0;
+  }
+}
+</style>

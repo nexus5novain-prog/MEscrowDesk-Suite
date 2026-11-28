@@ -1,0 +1,177 @@
+package com.ismartcoding.plain.ui.media.thumbnail
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.drawable.PictureDrawable
+import android.media.ThumbnailUtils
+import android.provider.MediaStore
+import android.util.Size
+import androidx.core.graphics.drawable.toBitmap
+import coil3.BitmapImage
+import coil3.SingletonImageLoader
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.size.Scale
+import com.ismartcoding.plain.lib.androidsvg.SvgParser
+import com.ismartcoding.plain.lib.androidsvg.renderToPicture
+import com.ismartcoding.plain.lib.extensions.getMediaContentUri
+import com.ismartcoding.plain.lib.extensions.isAudioFast
+import com.ismartcoding.plain.lib.extensions.isImageFast
+import com.ismartcoding.plain.lib.extensions.isPartialSupportVideo
+import com.ismartcoding.plain.lib.extensions.isVideoFast
+import com.ismartcoding.plain.lib.extensions.pathToMediaStoreUri
+import com.ismartcoding.plain.platform.isQPlus
+import com.ismartcoding.plain.lib.logcat.LogCat
+import java.io.ByteArrayOutputStream
+import java.io.File
+
+/**
+ * Generates thumbnails for images, videos, and SVG files.
+ *
+ * Decode pipeline for images:
+ *  1. SVG → render via AndroidSVG at target size.
+ *  2. Video → MediaStore.loadThumbnail (Q+) or ThumbnailUtils.
+ *  3. Image → [decodeSampledBitmapFromFile] fast BitmapFactory path
+ *     (single-pass: inSampleSize + inDensity/inTargetDensity).
+ *  4. Fallback → Coil (for formats BitmapFactory cannot decode, e.g. AVIF, HEIC).
+ *
+ * Encoding:
+ *  PNG preserves source PNG alpha; other formats use JPEG at quality 85.
+ *
+ * Caching:
+ *  Root manages thumbnail requests and the disk cache.
+ *  mediaId-based (MediaStore) thumbnails are excluded from disk cache since
+ *  they are already served from MediaStore's own cache layer.
+ */
+object ThumbnailGenerator {
+
+    /**
+     * Generate a thumbnail [Bitmap] for the given file.
+     * Returns null on failure; callers must recycle the bitmap after use.
+     */
+    suspend fun getBitmapAsync(
+        context: Context,
+        file: File,
+        width: Int,
+        height: Int,
+        centerCrop: Boolean = true,
+        mediaId: String = "",
+        fileName: String = "",
+    ): Bitmap? {
+        val effectiveName = fileName.ifEmpty { file.name }
+        if (centerCrop && effectiveName.endsWith(".svg", true)) {
+            return try {
+                val svg = SvgParser.parse(file.readText())
+                val picture = svg.renderToPicture(width, height)
+                PictureDrawable(picture).toBitmap(width, height)
+            } catch (ex: Exception) {
+                LogCat.e(ex.toString())
+                null
+            }
+        }
+
+        var bitmap: Bitmap? = null
+
+        // MediaStore thumbnail via ContentResolver.loadThumbnail (API 29+).
+        // Covers images, videos, and audio. For images/audio we only attempt this when
+        // mediaId is known (path lookup would require a full content-resolver scan).
+        if (isQPlus() && !effectiveName.endsWith(".png", true)) {
+            val isMedia = effectiveName.isVideoFast() || effectiveName.isImageFast() || effectiveName.isAudioFast()
+            if (isMedia && (centerCrop || !effectiveName.isImageFast())) {
+                val contentUri = when {
+                    mediaId.isNotEmpty() -> file.path.pathToMediaStoreUri(mediaId)
+                    effectiveName.isVideoFast() -> context.contentResolver.getMediaContentUri(file.path)
+                    else -> null  // images/audio without mediaId: skip to BitmapFactory
+                }
+                if (contentUri != null) {
+                    try {
+                        bitmap = context.contentResolver.loadThumbnail(contentUri, Size(width, height), null)
+                    } catch (ex: Exception) {
+                        LogCat.e(ex.toString())
+                    }
+                }
+                if (bitmap != null) return bitmap
+            }
+        }
+
+        if (effectiveName.isPartialSupportVideo()) {
+            return try {
+                if (isQPlus()) {
+                    ThumbnailUtils.createVideoThumbnail(file, Size(width, height), null)
+                } else {
+                    @Suppress("DEPRECATION")
+                    ThumbnailUtils.createVideoThumbnail(file.absolutePath, MediaStore.Video.Thumbnails.MICRO_KIND)
+                }
+            } catch (ex: Exception) {
+                LogCat.e(ex.toString())
+                null
+            }
+        }
+
+        if (effectiveName.isVideoFast()) {
+            return try {
+                if (isQPlus()) {
+                    ThumbnailUtils.createVideoThumbnail(file, Size(width, height), null)
+                } else {
+                    @Suppress("DEPRECATION")
+                    ThumbnailUtils.createVideoThumbnail(file.absolutePath, MediaStore.Video.Thumbnails.MICRO_KIND)
+                }
+            } catch (ex: Exception) {
+                LogCat.e(ex.toString())
+                null
+            }
+        }
+
+        // Fast BitmapFactory path (single-pass decode + scale + optional sharpen)
+        try {
+            bitmap = decodeSampledBitmapFromFile(file.absolutePath, width, height, centerCrop)
+        } catch (ex: Exception) {
+            LogCat.e(ex.toString())
+        }
+
+        // Coil fallback for formats BitmapFactory cannot decode (AVIF, HEIC, embedded audio art…)
+        if (bitmap == null) {
+            try {
+                val imageLoader = SingletonImageLoader.get(context)
+                val request = ImageRequest.Builder(context)
+                    .data(file)
+                    .size(width, height)
+                    .scale(if (centerCrop) Scale.FILL else Scale.FIT)
+                    .allowHardware(false)
+                    // One-shot decode-and-compress: the shared loader's memory cache
+                    // (up to 75% of the heap) would retain bitmaps that are never
+                    // reused — Root caches encoded thumbnails for repeat requests.
+                    .memoryCachePolicy(CachePolicy.DISABLED)
+                    .build()
+                bitmap = (imageLoader.execute(request).image as? BitmapImage)?.bitmap
+            } catch (ex: Exception) {
+                LogCat.e(ex.toString())
+            }
+        }
+
+        return bitmap
+    }
+
+    suspend fun decodeBytesAsync(
+        context: Context,
+        file: File,
+        width: Int,
+        height: Int,
+        centerCrop: Boolean,
+        mediaId: String,
+        fileName: String,
+    ): ByteArray? = DecodeLimiter.withPermit {
+        val bitmap = getBitmapAsync(context, file, width, height, centerCrop, mediaId, fileName) ?: return@withPermit null
+        compressThumbnail(bitmap, file.extension.equals("png", ignoreCase = true))
+    }
+
+    private fun compressThumbnail(bitmap: Bitmap, png: Boolean): ByteArray {
+        val stream = ByteArrayOutputStream()
+        return try {
+            val format = if (png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+            check(bitmap.compress(format, 85, stream)) { "Thumbnail encoding failed" }
+            stream.toByteArray()
+        } finally { bitmap.recycle() }
+    }
+}

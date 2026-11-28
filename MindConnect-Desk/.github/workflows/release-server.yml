@@ -1,0 +1,197 @@
+# =============================================================================
+# BetterDesk Go Server — Cross-Compile & Release
+# =============================================================================
+# Builds Go server binary for Linux (amd64, arm64) and Windows (amd64).
+# Triggers on main/dev pushes, version tag pushes (v*) or manual dispatch.
+# Every run publishes commit-bound artifacts; tag runs also attach binaries +
+# SHA256 checksums to a GitHub Release.
+# =============================================================================
+
+name: Build & Release Go Server
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v3.0.0)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-server-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SERVER_DIR: betterdesk-server
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64.exe
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
+        with:
+          go-version-file: ${{ env.SERVER_DIR }}/go.mod
+          cache-dependency-path: ${{ env.SERVER_DIR }}/go.sum
+
+      - name: Install Protobuf Compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Build binary
+        working-directory: ${{ env.SERVER_DIR }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION="$(tr -d '\r\n' < ../VERSION)"
+          BINARY_NAME="betterdesk-server-${{ matrix.suffix }}"
+          go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" \
+            -o "${BINARY_NAME}" .
+          SHA256="$(sha256sum "${BINARY_NAME}" | awk '{print $1}')"
+          SIZE="$(stat -c '%s' "${BINARY_NAME}")"
+          cat > "${BINARY_NAME}.manifest.json" <<EOF
+          {
+            "commit": "${GITHUB_SHA}",
+            "version": "${VERSION}",
+            "goos": "${{ matrix.goos }}",
+            "goarch": "${{ matrix.goarch }}",
+            "asset": "${BINARY_NAME}",
+            "size": ${SIZE},
+            "sha256": "${SHA256}"
+          }
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: betterdesk-server-${{ matrix.suffix }}
+          path: |
+            ${{ env.SERVER_DIR }}/betterdesk-server-${{ matrix.suffix }}
+            ${{ env.SERVER_DIR }}/betterdesk-server-${{ matrix.suffix }}.manifest.json
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Migration tool
+  # ---------------------------------------------------------------------------
+  build-migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
+        with:
+          go-version-file: ${{ env.SERVER_DIR }}/go.mod
+          cache-dependency-path: ${{ env.SERVER_DIR }}/go.sum
+
+      - name: Build migration tool (linux-amd64)
+        working-directory: ${{ env.SERVER_DIR }}/tools/migrate
+        env:
+          CGO_ENABLED: 1
+        run: go build -trimpath -ldflags="-s -w" -o migrate-linux-amd64 .
+
+      - name: Upload migration tool
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: migrate-linux-amd64
+          path: ${{ env.SERVER_DIR }}/tools/migrate/migrate-linux-amd64
+
+  # ---------------------------------------------------------------------------
+  # Release
+  # ---------------------------------------------------------------------------
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, build-migrate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+
+      - name: Generate checksums
+        run: |
+          find . -type f \( -name "betterdesk-server-*" -o -name "migrate-*" \) | while read -r f; do
+            sha256sum "$f" >> SERVER_CHECKSUMS.sha256
+          done
+          cat SERVER_CHECKSUMS.sha256
+
+      - name: Upload server artifacts to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Required: this job has no checkout; without GH_REPO, `gh` shells out to
+          # git and fails with "not a git repository".
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          release_exists() {
+            local err
+            err=$(mktemp)
+            if gh release view "$TAG_NAME" >"$err" 2>&1; then
+              rm -f "$err"
+              return 0
+            fi
+            echo "gh release view ${TAG_NAME} failed:" >&2
+            cat "$err" >&2
+            rm -f "$err"
+            return 1
+          }
+
+          # Prefer an existing release (version-bump / manual). If none appears
+          # after a short wait, create one from this tag so assets are not blocked
+          # by protected-main version-bump failures.
+          found=0
+          for attempt in $(seq 1 18); do
+            if release_exists; then
+              found=1
+              break
+            fi
+            echo "Release ${TAG_NAME} not visible yet (attempt ${attempt}/18); retrying in 10s..."
+            sleep 10
+          done
+
+          if [ "$found" -ne 1 ]; then
+            echo "Creating GitHub Release ${TAG_NAME} (version-bump did not publish it in time)"
+            # No --verify-tag: release job has no .git checkout.
+            gh release create "$TAG_NAME" \
+              --title "BetterDesk ${TAG_NAME#v}" \
+              --notes "BetterDesk ${TAG_NAME#v} server artifacts." \
+              --target "${GITHUB_SHA}"
+          fi
+
+          gh release upload "$TAG_NAME" \
+            betterdesk-server-linux-amd64/betterdesk-server-linux-amd64 \
+            betterdesk-server-linux-amd64/betterdesk-server-linux-amd64.manifest.json \
+            betterdesk-server-linux-arm64/betterdesk-server-linux-arm64 \
+            betterdesk-server-linux-arm64/betterdesk-server-linux-arm64.manifest.json \
+            betterdesk-server-windows-amd64.exe/betterdesk-server-windows-amd64.exe \
+            betterdesk-server-windows-amd64.exe/betterdesk-server-windows-amd64.exe.manifest.json \
+            migrate-linux-amd64/migrate-linux-amd64 \
+            SERVER_CHECKSUMS.sha256 \
+            --clobber

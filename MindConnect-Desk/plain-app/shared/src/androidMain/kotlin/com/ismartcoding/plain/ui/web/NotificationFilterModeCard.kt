@@ -1,0 +1,57 @@
+package com.ismartcoding.plain.ui.web
+import com.ismartcoding.plain.ui.theme.PlainTheme
+
+import com.ismartcoding.plain.features.notifications.NotificationFilterMode
+import com.ismartcoding.plain.i18n.*
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import org.jetbrains.compose.resources.stringResource
+import androidx.compose.ui.unit.dp
+import com.ismartcoding.plain.ui.base.PCard
+import com.ismartcoding.plain.ui.base.VerticalSpace
+
+@Composable
+fun NotificationFilterModeCard(
+    mode: NotificationFilterMode,
+    onToggleMode: () -> Unit,
+) {
+    PCard(modifier = Modifier.padding(horizontal = PlainTheme.PAGE_HORIZONTAL_MARGIN)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(Res.string.notification_filter_mode_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            VerticalSpace(dp = 12.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val chipColors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                FilterChip(
+                    selected = mode == NotificationFilterMode.ALLOWLIST,
+                    onClick = { if (mode != NotificationFilterMode.ALLOWLIST) onToggleMode() },
+                    label = { Text(stringResource(Res.string.allowlist_mode)) },
+                    colors = chipColors
+                )
+                FilterChip(
+                    selected = mode == NotificationFilterMode.BLACKLIST,
+                    onClick = { if (mode != NotificationFilterMode.BLACKLIST) onToggleMode() },
+                    label = { Text(stringResource(Res.string.blacklist_mode)) },
+                    colors = chipColors
+                )
+            }
+        }
+    }
+}

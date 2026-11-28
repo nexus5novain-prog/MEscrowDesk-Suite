@@ -1,0 +1,64 @@
+.btn-icon {
+  .circular-progress {
+    --size: 20px;
+  }
+}
+
+.v-filled-button {
+  .circular-progress {
+    --size: 18px;
+    color: var(--md-sys-color-on-primary);
+  }
+}
+
+// Danger variant — filled error-color button
+.v-filled-button.danger {
+  background-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  }
+
+  &:disabled {
+    background-color: rgba(0, 0, 0, 0.12);
+    color: rgba(0, 0, 0, 0.38);
+  }
+
+  .circular-progress {
+    color: var(--md-sys-color-on-error);
+  }
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.progress-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--md-sys-color-surface-container-high);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--md-sys-color-primary);
+  transition: width 0.3s;
+}
+
+.surface-card {
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--pl-shape-m);
+  padding: 14px 16px;
+}
+
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}

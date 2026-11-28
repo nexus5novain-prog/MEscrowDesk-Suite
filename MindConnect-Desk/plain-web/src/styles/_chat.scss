@@ -1,0 +1,365 @@
+@use 'form';
+
+.chat-section {
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline);
+  overflow: hidden;
+}
+
+.chat-item {
+  position: relative;
+  padding: 8px 12px 8px 16px;
+
+  &.self {
+    padding-left: 12px;
+    border-left: 4px solid var(--md-sys-color-primary);
+  }
+
+  &:hover {
+    background-color: var(--md-sys-color-surface-container-low);
+  }
+
+  .image-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 4px;
+  }
+}
+
+
+.chat-date {
+  color: var(--md-sys-color-secondary);
+  font-size: 0.8rem;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+
+.chat-time {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  min-width: 32px;
+  text-align: right;
+  margin-inline-end: 8px;
+}
+
+.chat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+
+  .name {
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .time {
+    color: var(--md-sys-color-outline);
+    font-size: 0.75rem;
+  }
+
+  .sending {
+    color: var(--md-sys-color-primary);
+    font-size: 0.75rem;
+  }
+
+  .send-error {
+    @include form.btn-icon-size(22px, 13px);
+
+    color: var(--md-sys-color-error);
+  }
+}
+
+.more-btn {
+  @include form.btn-icon-size(22px, 18px);
+
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+
+  .chat-item:hover &,
+  .chat-item:focus-within & {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-item {
+    padding: 8px 8px 8px 16px;
+  }
+}
+
+.chat-content {
+  pre {
+    font-family: inherit;
+    font-size: 0.9375rem;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  a {
+    color: var(--md-sys-color-primary);
+  }
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 2px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--md-sys-color-error);
+
+  .status-header-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--md-sys-color-error);
+    flex-shrink: 0;
+  }
+}
+
+.status-body {
+  padding: 2px 0;
+  max-width: 280px;
+}
+
+.status-summary {
+  padding: 4px 16px 0;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.status-peer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  white-space: normal;
+  word-break: break-word;
+
+  .status-peer-name {
+    flex-shrink: 0;
+    font-size: 0.85rem;
+  }
+
+  .status-peer-error {
+    font-size: 0.8rem;
+    color: var(--md-sys-color-error);
+  }
+
+  .status-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+
+    &.ok {
+      color: var(--md-sys-color-primary);
+    }
+
+    &.fail {
+      color: var(--md-sys-color-error);
+    }
+  }
+}
+
+.status-error {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  color: var(--md-sys-color-error);
+  max-width: 280px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.status-retry-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.image-container .media-item {
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  position: relative;
+  transition: padding 0.3s ease-in-out;
+  .duration {
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 8px 0 8px 0;
+  }
+}
+
+.chat-input {
+  background-color: var(--md-sys-color-surface);
+  padding: 8px 16px;
+  --outlined-field-bg: var(--md-sys-color-surface);
+
+  .leading-icons {
+    display: flex;
+    flex-direction: column;
+    margin-block-start: 4px;
+    align-items: center;
+  }
+
+  .btn-send {
+    margin-block-start: 4px;
+  }
+
+  .textarea-wrapper {
+    position: relative;
+
+    .textarea {
+      display: block;
+    }
+  }
+
+  .drag-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .input-toolbar {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px 8px;
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+  }
+}
+
+// The desktop composer has three leading actions. Keep them on one row so
+// the capture action cannot fall below the fixed textarea viewport; reserve
+// matching input space so the first line never renders underneath the tools.
+.chat-input.capture-enabled {
+  .leading-icons {
+    flex-direction: row;
+  }
+
+  .v-text-field:has(.leading-icon) .field-input {
+    padding-left: 128px;
+  }
+}
+
+.sms-chat-input {
+  .hidden-file-input {
+    display: none;
+  }
+  .leading-icons {
+    gap: 4px;
+  }
+
+  .chat-attachment-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .chat-attachment-preview-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--md-sys-color-surface-container-high);
+    border-radius: 8px;
+    padding: 4px 8px;
+    max-width: 200px;
+  }
+
+  .chat-preview-thumb {
+    width: 32px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .chat-preview-file {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    flex-shrink: 0;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .chat-preview-name {
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chat-preview-remove {
+    flex-shrink: 0;
+  }
+
+  .chat-preview-size {
+    font-size: 0.6875rem;
+    color: var(--md-sys-color-on-surface-variant);
+    flex-shrink: 0;
+
+    &.warn {
+      color: var(--md-sys-color-error);
+      font-weight: 500;
+    }
+  }
+
+  .chat-size-warning {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--md-sys-color-error);
+    padding: 4px 0;
+  }
+
+  .chat-size-hint {
+    font-size: 0.75rem;
+    color: var(--md-sys-color-on-surface-variant);
+    padding: 4px 0;
+    width: 100%;
+  }
+}

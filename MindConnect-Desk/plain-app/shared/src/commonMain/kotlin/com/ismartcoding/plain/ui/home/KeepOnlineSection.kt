@@ -1,0 +1,75 @@
+package com.ismartcoding.plain.ui.home
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.ismartcoding.plain.i18n.*
+import com.ismartcoding.plain.ui.base.AlertType
+import com.ismartcoding.plain.ui.base.PAlert
+import com.ismartcoding.plain.ui.base.PAlertTextButton
+import com.ismartcoding.plain.ui.base.PExpandableSection
+import com.ismartcoding.plain.ui.base.PFilledButton
+import com.ismartcoding.plain.ui.components.ButtonType
+import com.ismartcoding.plain.ui.base.VerticalSpace
+import com.ismartcoding.plain.ui.theme.tipsText
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun PlainAppServiceSection(
+    supportsBackgroundService: Boolean,
+    errorMessage: String,
+    onRetry: (() -> Unit)?,
+    onStayOnline: () -> Unit,
+) {
+    Column {
+        if (errorMessage.isNotEmpty()) {
+            PAlert(description = errorMessage, type = AlertType.ERROR, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+                if (onRetry != null) {
+                    PAlertTextButton(
+                        text = stringResource(Res.string.retry),
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        onClick = onRetry,
+                    )
+                }
+            }
+        }
+        val stayOnlineContent: @Composable () -> Unit = {
+            Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+                Text(
+                    text = stringResource(if (supportsBackgroundService) Res.string.connection_keeps_dropping_help else Res.string.stay_online_foreground_desc),
+                    style = MaterialTheme.typography.tipsText(),
+                )
+                VerticalSpace(16.dp)
+                PFilledButton(
+                    type = ButtonType.TONAL,
+                    modifier = Modifier.fillMaxWidth(),
+                    text = stringResource(Res.string.stay_online),
+                    onClick = onStayOnline,
+                )
+            }
+        }
+        if (supportsBackgroundService) {
+            var expanded by rememberSaveable { mutableStateOf(false) }
+            PExpandableSection(
+                text = stringResource(Res.string.connection_keeps_dropping),
+                expanded = expanded,
+                stateDescription = stringResource(if (expanded) Res.string.expanded else Res.string.collapsed),
+                onClick = { expanded = !expanded },
+                fadeContent = true,
+                content = stayOnlineContent,
+            )
+        } else {
+            VerticalSpace(16.dp)
+            stayOnlineContent()
+        }
+    }
+}

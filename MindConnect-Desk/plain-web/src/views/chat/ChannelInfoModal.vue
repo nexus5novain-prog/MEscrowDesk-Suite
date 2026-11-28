@@ -1,0 +1,108 @@
+<template>
+  <v-modal @close="close">
+    <template #headline>{{ $t('channel_info') }}</template>
+    <template #content>
+      <ul class="card list-items">
+        <v-list-item :title="$t('channel_name')" :value="channel.name" />
+      </ul>
+
+      <div class="section-title">{{ $t('channel_members') }} ({{ channel.members.length }})</div>
+      <ul class="card list-items">
+        <ChannelMemberListItem v-for="member in enrichedMembers" :key="member.peerId" :member="member">
+          <template v-if="channel.actions.canManageMembers && !member.isSelf && member.peerId !== channel.ownerId" #end>
+            <v-outlined-button v-if="member.status === MemberStatus.PENDING" :loading="pendingIds.has(member.peerId)" :disabled="pendingIds.has(member.peerId)" @click.stop="cancelInvite(member.peerId)">{{ $t('cancel') }}</v-outlined-button>
+            <v-outlined-button
+v-else v-tooltip="$t('remove_member')" 
+            :loading="pendingIds.has(member.peerId)" :disabled="pendingIds.has(member.peerId)" 
+            @click.stop="removeMember(member.peerId)" >{{ $t('remove') }}</v-outlined-button>
+          </template>
+        </ChannelMemberListItem>
+      </ul>
+
+      <template v-if="channel.actions.canManageMembers && availablePeers.length > 0">
+        <div class="section-title">{{ $t('add_member') }}</div>
+        <ul class="card list-items">
+          <ChannelMemberListItem
+v-for="peer in availablePeers" :key="peer.id" :member="{ peerId: peer.id, name: peer.name, ip: peer.ip, deviceType: peer.deviceType, isSelf: false, isOwner: false, status: peer.status }">
+            <template #end>
+              <v-outlined-button :loading="pendingIds.has(peer.id)" :disabled="pendingIds.has(peer.id)" @click.stop="addMember(peer.id)">{{ $t('invite') }}</v-outlined-button>
+            </template>
+          </ChannelMemberListItem>
+        </ul>
+      </template>
+    </template>
+    <template #actions>
+      <v-outlined-button @click="close">{{ $t('close') }}</v-outlined-button>
+    </template>
+  </v-modal>
+</template>
+
+<script setup lang="ts">
+import { showActionError } from '@/hooks/show-action-error'
+import { ref, reactive, computed, watch } from 'vue'
+import type { PropType } from 'vue'
+import type { IChatChannel, IPeer } from '@/lib/interfaces'
+import { MemberStatus, PeerStatus } from '@/lib/status'
+import { popModal } from '@/components/modal'
+import { initMutation, addChatChannelMemberGQL, removeChatChannelMemberGQL } from '@/lib/api/mutation'
+import { useTempStore } from '@/stores/temp'
+import { useChatStore } from '@/stores/chat'
+import type { IChannelMemberListItem } from './components/ChannelMemberListItem.vue'
+
+const props = defineProps({
+  channel: { type: Object as PropType<IChatChannel>, required: true },
+  peers: { type: Array as PropType<IPeer[]>, default: () => [] },
+  onMemberUpdated: { type: Function as PropType<() => void>, default: () => { } },
+})
+
+const channel = ref({ ...props.channel })
+const { app } = useTempStore()
+const selfId = app.clientId
+const deviceName = computed(() => app.deviceName || selfId.substring(0, 8))
+const memberIds = computed(() => new Set(channel.value.members.map((m) => m.peerId)))
+const availablePeers = computed(() => props.peers.filter((p) => p.status === PeerStatus.PAIRED && !memberIds.value.has(p.id)))
+
+const enrichedMembers = computed<IChannelMemberListItem[]>(() =>
+  channel.value.members.map((m) => {
+    const peer = props.peers.find((p) => p.id === m.peerId)
+    const isSelf = m.peerId === selfId
+    const isOwner = m.peerId === channel.value.ownerId || (isSelf && channel.value.ownerId === selfId)
+    return {
+      peerId: m.peerId,
+      status: m.status,
+      isSelf,
+      isOwner,
+      name: isSelf ? deviceName.value : peer?.name ?? m.peerId.substring(0, 8),
+      ip: isSelf ? undefined : peer?.ip,
+      deviceType: isSelf ? app.deviceType : peer?.deviceType,
+    }
+  }),
+)
+
+const { mutate: mutateAddMember, onDone: onAddMemberDone } = initMutation({ document: addChatChannelMemberGQL }, showActionError)
+const { mutate: mutateRemoveMember, onDone: onRemoveMemberDone } = initMutation({ document: removeChatChannelMemberGQL }, showActionError)
+
+onAddMemberDone((r: any) => { if (r.data?.addChatChannelMember) channel.value = { ...r.data.addChatChannelMember }; props.onMemberUpdated() })
+onRemoveMemberDone((r: any) => { if (r.data?.removeChatChannelMember) channel.value = { ...r.data.removeChatChannelMember }; props.onMemberUpdated() })
+
+const chatStore = useChatStore()
+watch(() => chatStore.findChannel(channel.value.id), (updated) => {
+  if (updated) channel.value = { ...updated }
+})
+
+const pendingIds = reactive(new Set<string>())
+
+function runMutation(id: string, mutate: (vars: any) => Promise<any>) {
+  if (pendingIds.has(id)) return
+  pendingIds.add(id)
+  mutate({ id: channel.value.id, peerId: id }).finally(() => {
+    pendingIds.delete(id)
+  })
+}
+
+function addMember(peerId: string) { runMutation(peerId, mutateAddMember) }
+function removeMember(peerId: string) { runMutation(peerId, mutateRemoveMember) }
+function cancelInvite(peerId: string) { runMutation(peerId, mutateRemoveMember) }
+function close() { popModal() }
+</script>
+

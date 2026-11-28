@@ -1,0 +1,121 @@
+package com.ismartcoding.plain.rust.graphql
+
+import com.ismartcoding.plain.models.ChatItemId
+import com.ismartcoding.plain.models.MediaChange
+import com.ismartcoding.plain.models.FileIndexScanProgress
+import com.ismartcoding.plain.lib.JsonHelper
+import com.ismartcoding.plain.lib.logcat.LogCat
+import com.ismartcoding.plain.platform.permissions.Permission
+import com.ismartcoding.plain.platform.permissions.isGranted
+import com.ismartcoding.plain.rust.RustRuntime
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
+import com.ismartcoding.plain.features.chat.channel.ChannelRuntimeEvent
+import com.ismartcoding.plain.features.images.search.ImageModelsSnapshot
+import com.ismartcoding.plain.models.PomodoroAction
+
+@OptIn(ExperimentalCoroutinesApi::class)
+object AppSubscriptions {
+    private val scope = RustRuntime.scope
+    internal val peersChanged =
+        subscription<Boolean>("peersChanged")
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val channelsChanged =
+        subscription<ChannelRuntimeEvent>(
+            "channelsChanged",
+            "{ changed invite { channelId ownerPeerId ownerPeerName } cancel { channelId " +
+                "ownerPeerId } }",
+        )
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val downloadsChanged =
+        subscription<Boolean>("downloadsChanged")
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val imageModelsUpdated =
+        subscription<ImageModelsSnapshot>(
+            "imageModelsUpdated",
+            "{ version status downloadProgress errorMessage modelSize modelDir " +
+                "isIndexing totalImages indexedImages }",
+        )
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val pairingRequested =
+        subscription<com.ismartcoding.plain.models.PairingRequestNotice>(
+            "pairingRequested",
+            "{ fromId fromName fromIp deviceType verificationCode identityChanged }",
+        )
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val pairingStarted = subscription<com.ismartcoding.plain.models.PairingProgressNotice>(
+        "pairingStarted", "{ deviceId deviceName error verificationCode }",
+    ).shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val pairingFailed = subscription<com.ismartcoding.plain.models.PairingProgressNotice>(
+        "pairingFailed", "{ deviceId deviceName error }",
+    ).shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val pairingCanceled = subscription<com.ismartcoding.plain.models.PairingProgressNotice>(
+        "pairingCanceled", "{ deviceId deviceName error }",
+    ).shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val pairingCompleted = subscription<com.ismartcoding.plain.models.PairingProgressNotice>(
+        "pairingCompleted", "{ deviceId deviceName }",
+    ).shareIn(scope, SharingStarted.WhileSubscribed())
+    internal val pomodoroAction =
+        subscription<PomodoroAction>(
+            "pomodoroAction",
+            "{ today { date state timeLeftSec totalTimeSec completedCount currentRound " +
+                "isRunning isPaused } completedState }",
+        )
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    val contentChanged =
+        subscription<Boolean>("contentChanged")
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    val accessUpdated =
+        subscription<Boolean>("accessUpdated")
+            .shareIn(scope, SharingStarted.WhileSubscribed(), replay = 1)
+    val messagesCreated =
+        subscription<List<ChatItemId>>("messagesCreated", "{ id }")
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    val messagesUpdated =
+        subscription<List<ChatItemId>>("messagesUpdated", "{ id }")
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    val messagesDeleted =
+        subscription<String>("messagesDeleted")
+            .shareIn(scope, SharingStarted.WhileSubscribed())
+    private val storageGranted = accessUpdated.changes()
+        .map { Permission.WRITE_EXTERNAL_STORAGE.isGranted() }
+        .distinctUntilChanged()
+    val mediaUpdated = storageGranted.flatMapLatest { granted ->
+        if (granted) subscription<MediaChange>("mediaUpdated", "{ types }") else emptyFlow()
+    }.shareIn(scope, SharingStarted.WhileSubscribed())
+    val fileIndexScanProgressUpdated = storageGranted.flatMapLatest { granted ->
+        if (granted) subscription<FileIndexScanProgress>("fileIndexScanProgressUpdated", "{ indexed pending total state error }") else emptyFlow()
+    }.shareIn(scope, SharingStarted.WhileSubscribed())
+
+    internal inline fun <reified T> subscription(field: String, selection: String = ""): Flow<SubscriptionUpdate<T>> = flow {
+        while (currentCoroutineContext().isActive) {
+            try {
+                RustGraphqlSubscriptions.subscribe(GraphqlOperation("subscription { $field $selection }")).collect { response ->
+                    if (response.errors.isNotEmpty()) throw GraphqlSubscriptionException(response.errors)
+                    if (response.extensions?.get("subscriptionReady")?.jsonPrimitive?.booleanOrNull == true) {
+                        emit(SubscriptionUpdate.Attached)
+                    }
+                    response.data?.get(field)?.let {
+                        emit(SubscriptionUpdate.Data(JsonHelper.jsonDecodeFromElement<T>(it)))
+                    }
+                }
+                return@flow
+            } catch (canceled: CancellationException) {
+                throw canceled
+            } catch (error: GraphqlSubscriptionException) {
+                if (!error.requiresResynchronization) {
+                    LogCat.e("GraphQL subscription $field", error)
+                    emit(SubscriptionUpdate.Failed(error))
+                    return@flow
+                }
+            } catch (error: Exception) {
+                LogCat.e("GraphQL subscription $field", error)
+                emit(SubscriptionUpdate.Failed(error))
+                return@flow
+            }
+        }
+    }
+}

@@ -1,0 +1,122 @@
+package com.ismartcoding.plain.features.chat.peer
+
+import com.ismartcoding.plain.models.AuthErrorCode
+import com.ismartcoding.plain.models.PeerConnectionErrorCode
+
+import com.ismartcoding.plain.models.BusinessException
+import com.ismartcoding.plain.features.chat.models.getBaseUrl
+
+import com.ismartcoding.plain.features.files.FileAction
+import com.ismartcoding.plain.features.notes.NotesApi
+import com.ismartcoding.plain.graphql.Mutation
+import com.ismartcoding.plain.graphql.Query
+import com.ismartcoding.plain.lib.extensions.urlEncode
+import com.ismartcoding.plain.models.ManagedDeviceInfo
+import com.ismartcoding.plain.models.Peer
+import com.ismartcoding.plain.rust.graphql.changes
+import com.ismartcoding.plain.rust.graphql.GraphqlApi
+import com.ismartcoding.plain.rust.graphql.GraphqlRequest
+import com.ismartcoding.plain.rust.graphql.GraphqlOperation
+import com.ismartcoding.plain.rust.graphql.GraphqlResponse
+import com.ismartcoding.plain.rust.graphql.SubscriptionUpdate
+import com.ismartcoding.plain.rust.graphql.RustGraphqlSubscriptions
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+
+internal enum class ResourceSize { SM, LG }
+
+internal class ManagedDeviceClient private constructor(
+    private val peer: Peer,
+    private val http: com.ismartcoding.plain.rust.graphql.PeerHttpClient,
+    initialInfo: ManagedDeviceInfo,
+    private val updates: (List<GraphqlOperation>) -> Flow<SubscriptionUpdate<GraphqlResponse>>,
+) {
+    companion object {
+        private fun infoRequest() = GraphqlRequest<ManagedDeviceInfo>(
+            "query { app { deviceName capabilities access appDir downloadsDir urlToken tlsCertificateSha256 } }", field = "app",
+        )
+
+        suspend fun load(
+            peer: Peer,
+            http: com.ismartcoding.plain.rust.graphql.PeerHttpClient = com.ismartcoding.plain.rust.graphql.PeerHttpClient(peer),
+            updates: (List<GraphqlOperation>) -> Flow<SubscriptionUpdate<GraphqlResponse>> = { RustGraphqlSubscriptions.subscribePeerUpdates(peer, it) },
+        ): ManagedDeviceClient = ManagedDeviceClient(peer, http, http.graphql.execute(infoRequest()), updates)
+    }
+    val api = http.graphql
+    fun subscribe(request: com.ismartcoding.plain.rust.graphql.GraphqlOperation) = subscribe(listOf(request))
+    fun subscribe(requests: List<GraphqlOperation>) = subscriptionUpdates(requests).transform { update ->
+        when (update) {
+            is SubscriptionUpdate.Data -> emit(update.value)
+            SubscriptionUpdate.Attached -> Unit
+            is SubscriptionUpdate.Failed -> throw update.error
+        }
+    }
+    val deviceType: com.ismartcoding.plain.platform.system.DeviceType get() = peer.deviceType
+    fun subscriptionUpdates(requests: List<GraphqlOperation>) = updates(requests)
+    fun changes(requests: List<com.ismartcoding.plain.rust.graphql.GraphqlOperation>) =
+        subscriptionUpdates(requests).changes()
+    val peerId: String get() = peer.id
+    val publicKey: String get() = peer.publicKey
+    val key: String get() = peer.id + ":" + peer.publicKey
+    private val _info = kotlinx.coroutines.flow.MutableStateFlow(initialInfo)
+    val state = _info.asStateFlow()
+    val currentInfo: ManagedDeviceInfo get() = _info.value
+    val access = state.map { it.access }.distinctUntilChanged()
+
+    suspend fun refreshAccess(): List<com.ismartcoding.plain.features.web.AccessFeature> =
+        api.execute(Query.appAccess()).also { access -> _info.value = _info.value.copy(access = access) }
+
+    private val uploads = com.ismartcoding.plain.features.files.upload.UploadChunksClient({ id, index, bytes ->
+        http.uploadChunk(id, index, bytes, currentInfo.tlsCertificateSha256 ?: throw BusinessException(PeerConnectionErrorCode.PEER_HTTPS_UNAVAILABLE.wire))
+    }, api)
+
+    suspend fun writeChunks(path: String, chunks: Iterator<ByteArray>): Boolean = uploads.replace(path, chunks)
+    val notes = NotesApi(api)
+
+    suspend fun info(): ManagedDeviceInfo = api.execute(infoRequest()).also { _info.value = it }
+
+    suspend fun roots(): List<com.ismartcoding.plain.models.ManagedStorageRoot> = api.execute(GraphqlRequest(
+        "query { mounts { name path } }", field = "mounts",
+    ))
+
+    suspend fun importAttachment(uri: String, fileName: String, mimeType: String): com.ismartcoding.plain.models.AppFile =
+        uploads.attachment(fileName, mimeType) { sink ->
+            checkNotNull(com.ismartcoding.plain.platform.files.streamContentUri(uri, sink)) { "Unable to read selected file" }
+        }
+
+    suspend fun absoluteResourceUrl(url: String): String =
+        if (url.startsWith("/")) http.current().getBaseUrl().trimEnd('/') + url else url
+
+    suspend fun resource(path: String, size: ResourceSize? = null, action: FileAction = FileAction.PREVIEW): com.ismartcoding.plain.models.ManagedResource {
+        val info = currentInfo
+        val current = http.current()
+        val fileId = http.encryptResourceReference(info.urlToken, path)
+        val base = current.getBaseUrl()
+        val url = managedResourceUrl(base, fileId, size, action)
+        return com.ismartcoding.plain.models.ManagedResource(url, info.tlsCertificateSha256 ?: throw BusinessException(PeerConnectionErrorCode.PEER_HTTPS_UNAVAILABLE.wire))
+    }
+
+    suspend fun thumbnailResources(paths: List<String>): Map<String, com.ismartcoding.plain.models.ManagedResource> =
+        paths.associateWith { resource(it, ResourceSize.SM) }
+
+    suspend fun downloadFile(path: String, name: String): String {
+        val request = resource(path, action = FileAction.DOWNLOAD)
+        val downloaded = com.ismartcoding.plain.features.files.RemoteFiles.download(request.url, name, request.tlsCertificateSha256)
+        val latest = GraphqlApi.execute(Query.peers()).find { it.id == peer.id }
+        if (!(latest?.isPaired() == true && latest.publicKey == peer.publicKey && latest.token == peer.token)) throw BusinessException(AuthErrorCode.PEER_IDENTITY_CHANGED.wire)
+        return downloaded
+    }
+}
+
+internal fun managedResourceUrl(base: String, fileId: String, size: ResourceSize?, action: FileAction = FileAction.PREVIEW): String =
+    buildString {
+        append(base.trimEnd('/'))
+        append("/fs?id=")
+        append(fileId.urlEncode())
+        append("&action=")
+        append(action.name)
+        size?.let { append("&size=").append(it.name) }
+    }

@@ -1,0 +1,64 @@
+name: Version Verify
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'VERSION'
+      - 'betterdesk-server/VERSION'
+      - 'betterdesk-server/internal/productversion/VERSION'
+      - 'web-nodejs/package.json'
+      - 'betterdesk.sh'
+      - 'betterdesk.ps1'
+      - 'betterdesk-docker.sh'
+      - 'install.sh'
+      - 'CHANGELOG.md'
+      - 'README.md'
+      - 'Dockerfile*'
+      - 'docker-compose.quick.yml'
+      - 'docker-compose.quick.single.yml'
+      - 'docker-compose.quick.single.macvlan.yml'
+      - 'docker/**'
+      - 'docker-entrypoint.sh'
+      - 'scripts/bump-version.js'
+      - '.github/workflows/version-verify.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'VERSION'
+      - 'betterdesk-server/VERSION'
+      - 'betterdesk-server/internal/productversion/VERSION'
+      - 'web-nodejs/package.json'
+      - 'betterdesk.sh'
+      - 'betterdesk.ps1'
+      - 'betterdesk-docker.sh'
+      - 'install.sh'
+      - 'CHANGELOG.md'
+      - 'README.md'
+      - 'Dockerfile*'
+      - 'docker-compose.quick.yml'
+      - 'docker-compose.quick.single.yml'
+      - 'docker-compose.quick.single.macvlan.yml'
+      - 'docker/**'
+      - 'docker-entrypoint.sh'
+      - 'scripts/bump-version.js'
+      - '.github/workflows/version-verify.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: version-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+      - name: Verify product version parity
+        run: node scripts/bump-version.js --verify

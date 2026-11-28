@@ -1,0 +1,27 @@
+export default {
+  "event_reason.MOUNT_FAILED": "Mount failed",
+  "event_reason.FORMAT_DISK_FAILED": "Format failed",
+  "event_reason.PEER_IDENTITY_CHANGED": "Client identity changed",
+  "event_reason.PASSWORD_SETUP_REQUIRED": "Sign-in password is not configured",
+  "event_reason.INTERNAL_ERROR": "Internal server error",
+
+  "events": "Events",
+  "event_client": "Client",
+  "event_type.LOGIN": "Signed in",
+  "event_type.LOGIN_FAILED": "Sign-in failed",
+  "event_type.LOGOUT": "Signed out",
+  "event_type.REVOKE_SESSION": "Session revoked",
+  "event_type.UPDATE_DEVICE_NAME": "Device name changed",
+  "event_type.MOUNT": "Disk mounted",
+  "event_type.MOUNT_FAILED": "Disk mount failed",
+  "event_type.UNMOUNT": "Disk unmounted",
+  "event_type.FORMAT_DISK": "Disk formatted",
+  "event_type.FORMAT_DISK_FAILED": "Disk format failed",
+  "event_reason.INVALID_PASSWORD": "Incorrect password",
+  "event_reason.INVALID_LOGIN_REQUEST": "Invalid sign-in request",
+  "event_reason.REMOTE_ACCESS_DISABLED": "Remote access is disabled",
+  "event_reason.TIMEOUT": "Sign-in request expired",
+  "event_reason.TOO_MANY_LOGIN_ATTEMPTS": "Too many sign-in attempts",
+  "event_reason.REJECTED": "Sign-in request rejected",
+  "event_reason.CANCELED": "Sign-in request canceled"
+}

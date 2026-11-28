@@ -1,0 +1,39 @@
+package com.ismartcoding.plain.ui.nearby
+
+import androidx.compose.runtime.Composable
+import com.ismartcoding.plain.features.nearby.PairingResponder
+import com.ismartcoding.plain.i18n.*
+import com.ismartcoding.plain.models.PairingRequestNotice
+import com.ismartcoding.plain.ui.components.RequestDecisionActions
+import com.ismartcoding.plain.ui.components.RequestPageLayout
+import com.ismartcoding.plain.ui.components.RequestVerificationCodeCard
+import com.ismartcoding.plain.ui.navigation.PBackHandler
+import com.ismartcoding.plain.ui.platform.system.getIcon
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun PairingRequestPage(
+    notice: PairingRequestNotice,
+    onClose: () -> Unit,
+) {
+    PBackHandler(onBack = onClose)
+
+    val displayIp = notice.fromIp
+    val requester = listOf(notice.fromName, displayIp).filter { it.isNotEmpty() }.joinToString(" · ")
+
+    RequestPageLayout(
+        title = stringResource(Res.string.pairing_request),
+        description = stringResource(if (notice.identityChanged) Res.string.pairing_identity_changed else Res.string.pairing_request_hint),
+        icon = painterResource(notice.deviceType.getIcon()),
+        requester = requester,
+        content = { item { RequestVerificationCodeCard(notice.verificationCode, stringResource(Res.string.pairing_compare_code)) } },
+        actions = {
+            RequestDecisionActions(
+                allowText = stringResource(if (notice.identityChanged) Res.string.pairing_trust else Res.string.allow),
+                onDeny = { PairingResponder.respond(notice.fromId, false); onClose() },
+                onAllow = { PairingResponder.respond(notice.fromId, true); onClose() },
+            )
+        },
+    )
+}

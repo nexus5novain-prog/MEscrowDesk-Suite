@@ -1,0 +1,266 @@
+import { showActionError } from '@/hooks/show-action-error'
+import type { IData } from '@/lib/interfaces'
+import { computed, ref, shallowRef, watch, type Ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import toast from '@/components/toaster'
+import { initMutation } from '@/lib/api/mutation'
+
+export const useSelectable = (items: Ref<IData[]>) => {
+  const allChecked = ref(false)
+  const realAllChecked = ref(false)
+  const total = ref(0)
+  const selectedIds = ref<string[]>([])
+  const selectedIdSet = computed(() => new Set(selectedIds.value))
+  // shift select
+  const lastCheckedIndex = ref<number | null>(null)
+  const shiftEffectingIds = ref<string[]>([])
+  const shiftEffectingIdSet = computed(() => new Set(shiftEffectingIds.value))
+  const shouldSelect = ref(false)
+
+  const updateAllCheckState = (checked: boolean) => {
+    if (checked) {
+      allChecked.value = items.value.every((it) => selectedIdSet.value.has(it.id))
+    } else {
+      allChecked.value = false
+      realAllChecked.value = false
+    }
+  }
+
+  const getShiftEffectingIds = (index: number) => {
+    if (lastCheckedIndex.value === null) return []
+    const start = Math.min(lastCheckedIndex.value, index)
+    const end = Math.max(lastCheckedIndex.value, index)
+    const lastIndexId = items.value[lastCheckedIndex.value].id
+    return items.value
+      .slice(start, end + 1)
+      .map((it) => it.id)
+      .filter((it) => it !== lastIndexId)
+  }
+
+  const toggleShiftSelection = (item: IData, index: number) => {
+    // 没有锚点或点了同一项，回退到普通 toggle
+    if (lastCheckedIndex.value === null || lastCheckedIndex.value === index) {
+      checkItem(!selectedIds.value.includes(item.id), item, index)
+      return
+    }
+    // 优先用 hover 预览的 ids；没有预览就实时计算区间，让"裸 shift+click"也能范围选择
+    const ids = shiftEffectingIds.value.length > 0
+      ? shiftEffectingIds.value
+      : getShiftEffectingIds(index)
+    if (ids.length > 0) {
+      if (shouldSelect.value) {
+        const additions = ids.filter((id) => !selectedIdSet.value.has(id))
+        if (additions.length > 0) {
+          selectedIds.value = [...selectedIds.value, ...additions]
+        }
+      } else {
+        const removals = new Set(ids)
+        selectedIds.value = selectedIds.value.filter((it) => !removals.has(it))
+      }
+    } else {
+      checkItem(!selectedIds.value.includes(item.id), item, index)
+      return
+    }
+    shiftEffectingIds.value = []
+    lastCheckedIndex.value = index
+    shouldSelect.value = selectedIds.value.includes(item.id)
+    updateAllCheckState(shouldSelect.value)
+  }
+
+  const checkItem = (checked: boolean, item: IData, index: number) => {
+    if (checked) {
+      selectedIds.value.push(item.id)
+    } else {
+      selectedIds.value = selectedIds.value.filter((id) => id !== item.id)
+    }
+    lastCheckedIndex.value = index
+    shouldSelect.value = checked
+    updateAllCheckState(checked)
+  }
+
+  const selectAll = () => {
+    allChecked.value = true
+    selectedIds.value = items.value.map((it) => it.id)
+  }
+
+  const groupSelectionState = (groupItems: IData[]) => {
+    const count = groupItems.reduce((acc, it) => acc + (selectedIdSet.value.has(it.id) ? 1 : 0), 0)
+    return {
+      checked: groupItems.length > 0 && count === groupItems.length,
+      indeterminate: count > 0 && count < groupItems.length,
+    }
+  }
+
+  const setGroupChecked = (groupItems: IData[], checked: boolean) => {
+    if (checked) {
+      for (const it of groupItems) {
+        if (!selectedIds.value.includes(it.id)) {
+          selectedIds.value.push(it.id)
+        }
+      }
+    } else {
+      const ids = new Set(groupItems.map((it) => it.id))
+      selectedIds.value = selectedIds.value.filter((id) => !ids.has(id))
+    }
+    updateAllCheckState(checked)
+  }
+
+  const toggleGroupChecked = (event: Event, groupItems: IData[]) => {
+    setGroupChecked(groupItems, (event.target as HTMLInputElement).checked)
+  }
+
+  watch(() => items.value.map((item) => item.id), (ids, previous) => {
+    if (ids.length === previous.length && ids.every((id, index) => id === previous[index])) return
+    const available = new Set(ids)
+    if (lastCheckedIndex.value !== null) {
+      const index = ids.indexOf(previous[lastCheckedIndex.value])
+      lastCheckedIndex.value = index < 0 ? null : index
+    }
+    shiftEffectingIds.value = []
+
+    if (ids.length !== previous.length || previous.some((id) => !available.has(id))) {
+      realAllChecked.value = false
+    }
+    const retained = selectedIds.value.filter((id) => available.has(id))
+    if (retained.length !== selectedIds.value.length) selectedIds.value = retained
+    allChecked.value = retained.length > 0 && retained.length === available.size
+  }, { flush: 'sync' })
+
+  return {
+    realAllChecked,
+    allChecked,
+    toggleAllChecked: (event: Event) => {
+      if ((event.target as HTMLInputElement).checked) {
+        selectAll()
+      } else {
+        allChecked.value = false
+        realAllChecked.value = false
+        selectedIds.value = []
+      }
+    },
+    selectAll,
+    groupSelectionState,
+    setGroupChecked,
+    toggleGroupChecked,
+    allCheckedAlertVisible: computed<boolean>(() => {
+      return allChecked.value && !realAllChecked.value && selectedIds.value.length < total.value
+    }),
+    selectRealAll: () => {
+      realAllChecked.value = true
+    },
+    clearSelection: () => {
+      allChecked.value = false
+      realAllChecked.value = false
+      selectedIds.value = []
+      lastCheckedIndex.value = null
+      shouldSelect.value = false
+      shiftEffectingIds.value = []
+    },
+    selectedIds,
+    selectedIdSet,
+    total,
+    checked: computed<boolean>(() => {
+      return selectedIds.value.length > 0
+    }),
+    // shift select
+    shouldSelect,
+    shiftEffectingIds,
+    shiftEffectingIdSet,
+    toggleSelect: (event: MouseEvent, item: IData, index: number) => {
+      if (event.shiftKey) {
+        toggleShiftSelection(item, index)
+      } else {
+        checkItem(!selectedIds.value.includes(item.id), item, index)
+      }
+    },
+    handleItemClick(event: MouseEvent, item: IData, index: number, view: (i: number) => void = () => {}) {
+      if ((event.target as Element)?.nodeName === 'V-CHECKBOX') {
+        return
+      }
+
+      const selection = window.getSelection()
+      if (selection && selection.toString()) {
+        const currentTarget = event.currentTarget as Element
+        if (currentTarget && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0)
+          if (currentTarget.contains(range.commonAncestorContainer)) {
+            return
+          }
+        }
+      }
+
+      if (selectedIds.value.length === 0) {
+        view(index)
+        return
+      }
+      if (event.shiftKey) {
+        toggleShiftSelection(item, index)
+      } else {
+        checkItem(!selectedIds.value.includes(item.id), item, index)
+      }
+    },
+    handleMouseOver(event: MouseEvent, index: number) {
+      if (event.shiftKey) {
+        if (lastCheckedIndex.value !== null && lastCheckedIndex.value !== index) {
+          shiftEffectingIds.value = getShiftEffectingIds(index)
+        }
+      } else {
+        shiftEffectingIds.value = []
+      }
+    },
+  }
+}
+
+/**
+ * Query sent for a "select all" bulk action. An empty filter would be rejected by the
+ * server's empty-query bulk guard, so whole-table intent falls back to the explicit
+ * `all:true` sentinel.
+ */
+export const selectAllQuery = (query: string) => query.trim() || 'all:true'
+
+export function useListConfirmation<T>(isCurrent: (target: T) => boolean) {
+  const pending = shallowRef<T | null>(null)
+  const close = () => { pending.value = null }
+
+  watch(() => pending.value !== null && !isCurrent(pending.value), (invalid) => {
+    if (invalid) close()
+  }, { flush: 'sync' })
+
+  return { pending, open: (target: T) => { pending.value = target }, close }
+}
+
+type DeleteSelection = Pick<ReturnType<typeof useSelectable>, 'selectedIds' | 'realAllChecked' | 'total'>
+
+export function useDelete(gql: string, selection: DeleteSelection, query: Ref<string>, done: (query: string) => void, type?: string) {
+  const { t } = useI18n()
+  const target = computed(() => selection.realAllChecked.value
+    ? { query: selectAllQuery(query.value), count: selection.total.value }
+    : { query: `ids:${selection.selectedIds.value.join(',')}`, count: selection.selectedIds.value.length })
+  const { pending, open, close } = useListConfirmation<typeof target.value>(
+    (snapshot) => snapshot.query === target.value.query && snapshot.count === target.value.count,
+  )
+  const { mutate, loading: deleteLoading } = initMutation({ document: gql }, showActionError)
+
+  return {
+    confirmingDelete: computed(() => pending.value !== null),
+    deleteCount: computed(() => pending.value?.count ?? 0),
+    deleteLoading,
+    deleteItems: () => {
+      if (deleteLoading.value) return
+      if (!target.value.count) {
+        toast(t('select_first'), 'error')
+        return
+      }
+      open(target.value)
+    },
+    doDeleteItems: async () => {
+      if (!pending.value || deleteLoading.value) return
+      const { query } = pending.value
+      if (await mutate(type ? { type, query } : { query })) {
+        close()
+        done(query)
+      }
+    },
+    cancelDeleteItems: close,
+  }
+}
